@@ -6,17 +6,39 @@ import { cn } from '@/lib/utils';
 interface VideoPreviewProps {
   project: VideoProject;
   isPlaying: boolean;
+  currentTime: number;
+  duration: number;
 }
 
 export const VideoPreview = forwardRef<HTMLDivElement, VideoPreviewProps>(
-  ({ project, isPlaying }, ref) => {
+  ({ project, isPlaying, currentTime, duration }, ref) => {
     const [isFullscreen, setIsFullscreen] = useState(false);
     const canvasSize = CANVAS_SIZES[project.canvasFormat];
     const aspectRatio = canvasSize.width / canvasSize.height;
 
-    // Calculate scroll animation duration based on speed (1-20)
-    // Speed 1 = 20s, Speed 20 = 1s
-    const scrollDuration = (21 - project.animation.speed);
+    // Calculate animation progress (0 to 1)
+    const progress = duration > 0 ? currentTime / duration : 0;
+
+    // Calculate scroll amount based on progress and direction
+    const getTransformStyle = (): React.CSSProperties => {
+      if (!isPlaying && currentTime === 0) {
+        // Static position when not playing
+        return {};
+      }
+
+      const scrollPercent = progress * 100;
+      
+      switch (project.animation.direction) {
+        case 'up':
+          return { transform: `translateY(${100 - scrollPercent * 2}%)` };
+        case 'left':
+          return { transform: `translateX(${100 - scrollPercent * 2}%)` };
+        case 'right':
+          return { transform: `translateX(${-100 + scrollPercent * 2}%)` };
+        default:
+          return {};
+      }
+    };
 
     const textStyle: React.CSSProperties = {
       fontFamily: project.text.fontFamily,
@@ -29,16 +51,8 @@ export const VideoPreview = forwardRef<HTMLDivElement, VideoPreviewProps>(
       color: project.text.color,
       whiteSpace: 'pre-wrap',
       padding: '2rem',
-    };
-
-    const getAnimationClass = () => {
-      if (!isPlaying) return '';
-      switch (project.animation.direction) {
-        case 'up': return 'animate-scroll-up';
-        case 'left': return 'animate-scroll-left';
-        case 'right': return 'animate-scroll-right';
-        default: return '';
-      }
+      transition: isPlaying ? 'none' : 'transform 0.1s ease-out',
+      ...getTransformStyle(),
     };
 
     const toggleFullscreen = () => {
@@ -53,20 +67,27 @@ export const VideoPreview = forwardRef<HTMLDivElement, VideoPreviewProps>(
       return () => window.removeEventListener('keydown', handleEsc);
     }, []);
 
+    // Show placeholder text if content is empty
+    const displayContent = project.text.content || 'Enter your text in the sidebar...';
+
     return (
       <>
         <div className={cn(
-          'relative w-full h-full flex items-center justify-center',
+          'relative w-full h-full flex items-center justify-center p-4',
           isFullscreen && 'fixed inset-0 z-50 bg-black/90 p-8'
         )}>
           {/* Canvas Container */}
           <div
             ref={ref}
-            className="relative overflow-hidden rounded-2xl shadow-medium"
+            className="relative overflow-hidden rounded-2xl shadow-medium border-2 border-border/50"
             style={{
               aspectRatio: `${canvasSize.width} / ${canvasSize.height}`,
-              maxHeight: isFullscreen ? '90vh' : '70vh',
+              width: aspectRatio >= 1 ? '100%' : 'auto',
+              height: aspectRatio < 1 ? '100%' : 'auto',
+              maxHeight: isFullscreen ? '90vh' : '65vh',
               maxWidth: isFullscreen ? '90vw' : '100%',
+              minHeight: '200px',
+              minWidth: '150px',
               backgroundColor: project.background.color,
             }}
           >
@@ -99,22 +120,27 @@ export const VideoPreview = forwardRef<HTMLDivElement, VideoPreviewProps>(
               />
             )}
 
-            {/* Scrolling Text */}
+            {/* Text Content - Always Visible */}
             <div 
               className={cn(
-                'absolute inset-0 flex',
+                'absolute inset-0 flex overflow-hidden',
                 project.animation.direction === 'up' ? 'flex-col justify-center items-center' : 'flex-row items-center',
-                getAnimationClass()
               )}
-              style={{
-                '--scroll-duration': `${scrollDuration}s`,
-                animationPlayState: isPlaying ? 'running' : 'paused',
-                animationIterationCount: project.animation.isLooping ? 'infinite' : '1',
-              } as React.CSSProperties}
             >
-              <div style={textStyle}>
-                {project.text.content}
+              <div 
+                style={textStyle}
+                className={cn(
+                  'w-full',
+                  !project.text.content && 'text-muted-foreground/50 italic'
+                )}
+              >
+                {displayContent}
               </div>
+            </div>
+
+            {/* Canvas Size Label */}
+            <div className="absolute bottom-2 left-2 px-2 py-1 rounded-md bg-black/50 text-white text-xs font-mono">
+              {canvasSize.width} × {canvasSize.height}
             </div>
           </div>
 
@@ -124,7 +150,7 @@ export const VideoPreview = forwardRef<HTMLDivElement, VideoPreviewProps>(
             className={cn(
               'absolute p-2 rounded-xl bg-card/80 backdrop-blur-sm border border-border',
               'hover:bg-card transition-colors',
-              isFullscreen ? 'top-4 right-4' : 'top-2 right-2'
+              isFullscreen ? 'top-4 right-4' : 'top-6 right-6'
             )}
           >
             {isFullscreen ? (
