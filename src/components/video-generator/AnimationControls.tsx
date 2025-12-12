@@ -1,7 +1,8 @@
-import { ArrowUp, ArrowLeft, ArrowRight, RotateCcw } from 'lucide-react';
+import { ArrowUp, ArrowLeft, ArrowRight, RotateCcw, Clock, Zap } from 'lucide-react';
 import { AnimationSettings, ScrollDirection } from '@/types/video-project';
 import { Slider } from '@/components/ui/slider';
 import { Switch } from '@/components/ui/switch';
+import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 
 interface AnimationControlsProps {
@@ -15,11 +16,11 @@ const directions: { value: ScrollDirection; icon: typeof ArrowUp; label: string 
   { value: 'right', icon: ArrowRight, label: 'Right' },
 ];
 
+const durationPresets = [5, 10, 15, 30, 45, 60];
+
 export function AnimationControls({ settings, onChange }: AnimationControlsProps) {
   return (
-    <div className="space-y-4">
-      <h3 className="text-sm font-semibold text-foreground">Animation</h3>
-
+    <div className="space-y-5">
       {/* Scroll Direction */}
       <div className="space-y-2">
         <label className="text-xs font-medium text-muted-foreground">Scroll Direction</label>
@@ -43,46 +44,85 @@ export function AnimationControls({ settings, onChange }: AnimationControlsProps
         </div>
       </div>
 
-      {/* Speed Slider */}
-      <div className="space-y-2">
-        <div className="flex justify-between">
-          <label className="text-xs font-medium text-muted-foreground">Speed</label>
-          <span className="text-xs font-mono text-secondary">
-            {settings.speed < 7 ? 'Slow' : settings.speed < 14 ? 'Medium' : 'Fast'}
-          </span>
+      {/* Speed Control - Enhanced */}
+      <div className="space-y-3 p-4 rounded-xl bg-gradient-to-br from-secondary/5 to-accent/5 border border-secondary/20">
+        <div className="flex items-center gap-2">
+          <Zap className="w-4 h-4 text-secondary" />
+          <label className="text-sm font-semibold text-foreground">Scroll Speed</label>
         </div>
-        <Slider
-          value={[settings.speed]}
-          onValueChange={([v]) => onChange({ speed: v })}
-          min={1}
-          max={20}
-          step={1}
-          className="py-2"
-        />
-        <div className="flex justify-between text-[10px] text-muted-foreground">
-          <span>🐢 Slower</span>
-          <span>🐇 Faster</span>
+        <div className="space-y-2">
+          <div className="flex justify-between items-center">
+            <span className="text-xs text-muted-foreground">
+              {settings.speed < 7 ? '🐢 Slow' : settings.speed < 14 ? '🚶 Medium' : '🐇 Fast'}
+            </span>
+            <span className="text-lg font-bold text-secondary">{settings.speed}</span>
+          </div>
+          <Slider
+            value={[settings.speed]}
+            onValueChange={([v]) => onChange({ speed: v })}
+            min={1}
+            max={20}
+            step={1}
+            className="py-2"
+          />
+          <div className="flex justify-between text-[10px] text-muted-foreground">
+            <span>1 (Slowest)</span>
+            <span>20 (Fastest)</span>
+          </div>
         </div>
       </div>
 
-      {/* Duration */}
-      <div className="space-y-2">
-        <div className="flex justify-between">
-          <label className="text-xs font-medium text-muted-foreground">Duration</label>
-          <span className="text-xs font-mono text-secondary">{settings.duration}s</span>
+      {/* Video Duration - Enhanced */}
+      <div className="space-y-3 p-4 rounded-xl bg-gradient-to-br from-primary/5 to-accent/5 border border-primary/20">
+        <div className="flex items-center gap-2">
+          <Clock className="w-4 h-4 text-primary" />
+          <label className="text-sm font-semibold text-foreground">Video Length</label>
         </div>
-        <Slider
-          value={[settings.duration]}
-          onValueChange={([v]) => onChange({ duration: v })}
-          min={5}
-          max={60}
-          step={5}
-          className="py-2"
-        />
-        <div className="flex justify-between text-[10px] text-muted-foreground">
-          <span>5s</span>
-          <span>60s</span>
+        
+        {/* Quick Presets */}
+        <div className="grid grid-cols-6 gap-1.5">
+          {durationPresets.map((preset) => (
+            <button
+              key={preset}
+              onClick={() => onChange({ duration: preset })}
+              className={cn(
+                'py-1.5 px-2 rounded-lg text-xs font-medium transition-all',
+                settings.duration === preset
+                  ? 'bg-primary text-primary-foreground shadow-sm'
+                  : 'bg-muted/50 text-muted-foreground hover:bg-muted'
+              )}
+            >
+              {preset}s
+            </button>
+          ))}
         </div>
+
+        {/* Custom Duration Input */}
+        <div className="flex items-center gap-2">
+          <Slider
+            value={[settings.duration]}
+            onValueChange={([v]) => onChange({ duration: v })}
+            min={3}
+            max={120}
+            step={1}
+            className="flex-1 py-2"
+          />
+          <div className="flex items-center gap-1">
+            <Input
+              type="number"
+              value={settings.duration}
+              onChange={(e) => {
+                const v = parseInt(e.target.value);
+                if (v >= 3 && v <= 120) onChange({ duration: v });
+              }}
+              className="w-16 h-8 text-center text-sm font-mono"
+              min={3}
+              max={120}
+            />
+            <span className="text-xs text-muted-foreground">sec</span>
+          </div>
+        </div>
+        <p className="text-[10px] text-muted-foreground">Range: 3 seconds to 2 minutes</p>
       </div>
 
       {/* Loop Toggle */}

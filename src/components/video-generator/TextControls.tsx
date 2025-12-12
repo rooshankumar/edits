@@ -163,6 +163,20 @@ export function TextControls({ settings, onChange }: TextControlsProps) {
             className="flex-1 px-3 py-2 rounded-lg bg-muted/50 border border-border text-sm font-mono"
           />
         </div>
+        {/* Color Presets */}
+        <div className="flex gap-1.5 flex-wrap">
+          {['#ffffff', '#000000', '#ff6b6b', '#4ecdc4', '#ffe66d', '#a855f7', '#3b82f6', '#22c55e'].map((color) => (
+            <button
+              key={color}
+              onClick={() => onChange({ color })}
+              className={cn(
+                'w-7 h-7 rounded-lg border-2 transition-all hover:scale-110',
+                settings.color === color ? 'border-primary ring-2 ring-primary/30' : 'border-border'
+              )}
+              style={{ backgroundColor: color }}
+            />
+          ))}
+        </div>
       </div>
     </div>
   );
