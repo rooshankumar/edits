@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect } from 'react';
-import { VideoProject, DEFAULT_PROJECT, CanvasFormat, TextSettings, BackgroundSettings, AnimationSettings } from '@/types/video-project';
+import { VideoProject, DEFAULT_PROJECT, CanvasFormat, TextSettings, BackgroundSettings, AnimationSettings, AudioSettings } from '@/types/video-project';
 
 const STORAGE_KEY = 'scrolling-video-projects';
 const CURRENT_PROJECT_KEY = 'scrolling-video-current';
@@ -11,7 +11,17 @@ export function useVideoProject() {
     const saved = localStorage.getItem(CURRENT_PROJECT_KEY);
     if (saved) {
       try {
-        return JSON.parse(saved);
+        const parsed = JSON.parse(saved);
+        // Ensure new fields exist with defaults
+        return {
+          ...DEFAULT_PROJECT,
+          ...parsed,
+          text: { ...DEFAULT_PROJECT.text, ...parsed.text },
+          audio: { ...DEFAULT_PROJECT.audio, ...parsed.audio },
+          id: parsed.id || generateId(),
+          createdAt: parsed.createdAt || Date.now(),
+          updatedAt: parsed.updatedAt || Date.now(),
+        };
       } catch {
         // ignore
       }
@@ -78,6 +88,14 @@ export function useVideoProject() {
     }));
   }, []);
 
+  const updateAudio = useCallback((updates: Partial<AudioSettings>) => {
+    setProject(prev => ({
+      ...prev,
+      audio: { ...prev.audio, ...updates },
+      updatedAt: Date.now(),
+    }));
+  }, []);
+
   const setCanvasFormat = useCallback((format: CanvasFormat) => {
     updateProject({ canvasFormat: format });
   }, [updateProject]);
@@ -97,7 +115,12 @@ export function useVideoProject() {
   const loadProject = useCallback((id: string) => {
     const found = savedProjects.find(p => p.id === id);
     if (found) {
-      setProject(found);
+      setProject({
+        ...DEFAULT_PROJECT,
+        ...found,
+        text: { ...DEFAULT_PROJECT.text, ...found.text },
+        audio: { ...DEFAULT_PROJECT.audio, ...found.audio },
+      });
     }
   }, [savedProjects]);
 
@@ -131,6 +154,7 @@ export function useVideoProject() {
     updateText,
     updateBackground,
     updateAnimation,
+    updateAudio,
     setCanvasFormat,
     saveProject,
     loadProject,

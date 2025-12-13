@@ -1,4 +1,4 @@
-import { forwardRef, useState, useEffect } from 'react';
+import { forwardRef, useState, useEffect, useRef } from 'react';
 import { Maximize2, Minimize2 } from 'lucide-react';
 import { VideoProject, CANVAS_SIZES } from '@/types/video-project';
 import { cn } from '@/lib/utils';
@@ -13,28 +13,62 @@ interface VideoPreviewProps {
 export const VideoPreview = forwardRef<HTMLDivElement, VideoPreviewProps>(
   ({ project, isPlaying, currentTime, duration }, ref) => {
     const [isFullscreen, setIsFullscreen] = useState(false);
+    const textRef = useRef<HTMLDivElement>(null);
+    const containerRef = useRef<HTMLDivElement>(null);
+    const audioRef = useRef<HTMLAudioElement>(null);
     const canvasSize = CANVAS_SIZES[project.canvasFormat];
     const aspectRatio = canvasSize.width / canvasSize.height;
 
     // Calculate animation progress (0 to 1)
     const progress = duration > 0 ? currentTime / duration : 0;
 
-    // Calculate scroll amount based on progress and direction
-    const getTransformStyle = (): React.CSSProperties => {
-      if (!isPlaying && currentTime === 0) {
-        // Static position when not playing
-        return {};
+    // Handle audio playback
+    useEffect(() => {
+      if (audioRef.current && project.audio.file) {
+        audioRef.current.volume = project.audio.volume / 100;
+        audioRef.current.loop = project.audio.loop;
+        
+        if (isPlaying) {
+          audioRef.current.currentTime = currentTime;
+          audioRef.current.play().catch(() => {});
+        } else {
+          audioRef.current.pause();
+        }
       }
+    }, [isPlaying, project.audio.file, project.audio.volume, project.audio.loop]);
 
-      const scrollPercent = progress * 100;
+    // Movie credits style animation calculation
+    // Text starts below the screen and scrolls up until it's above the screen
+    const getTransformStyle = (): React.CSSProperties => {
+      const containerHeight = containerRef.current?.offsetHeight || 500;
+      const textHeight = textRef.current?.offsetHeight || 300;
+      
+      // Total distance: from bottom of screen to top (off screen)
+      const totalScrollDistance = containerHeight + textHeight;
       
       switch (project.animation.direction) {
-        case 'up':
-          return { transform: `translateY(${100 - scrollPercent * 2}%)` };
-        case 'left':
-          return { transform: `translateX(${100 - scrollPercent * 2}%)` };
-        case 'right':
-          return { transform: `translateX(${-100 + scrollPercent * 2}%)` };
+        case 'up': {
+          // Start at bottom (containerHeight), end at top (-textHeight)
+          const startY = containerHeight;
+          const currentY = startY - (progress * totalScrollDistance);
+          return { transform: `translateY(${currentY}px)` };
+        }
+        case 'left': {
+          const containerWidth = containerRef.current?.offsetWidth || 400;
+          const textWidth = textRef.current?.offsetWidth || 300;
+          const totalDistance = containerWidth + textWidth;
+          const startX = containerWidth;
+          const currentX = startX - (progress * totalDistance);
+          return { transform: `translateX(${currentX}px)` };
+        }
+        case 'right': {
+          const containerWidth = containerRef.current?.offsetWidth || 400;
+          const textWidth = textRef.current?.offsetWidth || 300;
+          const totalDistance = containerWidth + textWidth;
+          const startX = -textWidth;
+          const currentX = startX + (progress * totalDistance);
+          return { transform: `translateX(${currentX}px)` };
+        }
         default:
           return {};
       }
@@ -50,8 +84,11 @@ export const VideoPreview = forwardRef<HTMLDivElement, VideoPreviewProps>(
       textAlign: project.text.textAlign,
       color: project.text.color,
       whiteSpace: 'pre-wrap',
-      padding: '2rem',
-      transition: isPlaying ? 'none' : 'transform 0.1s ease-out',
+      width: `${project.text.containerWidth}%`,
+      paddingLeft: `${project.text.paddingX}px`,
+      paddingRight: `${project.text.paddingX}px`,
+      paddingTop: `${project.text.paddingY}px`,
+      paddingBottom: `${project.text.paddingY}px`,
       ...getTransformStyle(),
     };
 
@@ -67,27 +104,31 @@ export const VideoPreview = forwardRef<HTMLDivElement, VideoPreviewProps>(
       return () => window.removeEventListener('keydown', handleEsc);
     }, []);
 
-    // Show placeholder text if content is empty
-    const displayContent = project.text.content || 'Enter your text in the sidebar...';
+    const displayContent = project.text.content || 'Enter your text...';
 
     return (
       <>
+        {/* Audio element */}
+        {project.audio.file && (
+          <audio ref={audioRef} src={project.audio.file} />
+        )}
+
         <div className={cn(
-          'relative w-full h-full flex items-center justify-center p-4',
-          isFullscreen && 'fixed inset-0 z-50 bg-black/90 p-8'
+          'relative w-full h-full flex items-center justify-center',
+          isFullscreen && 'fixed inset-0 z-50 bg-black/95 p-8'
         )}>
           {/* Canvas Container */}
           <div
             ref={ref}
-            className="relative overflow-hidden rounded-2xl shadow-medium border-2 border-border/50"
+            className="relative overflow-hidden rounded-xl shadow-medium border border-border/50"
             style={{
               aspectRatio: `${canvasSize.width} / ${canvasSize.height}`,
               width: aspectRatio >= 1 ? '100%' : 'auto',
               height: aspectRatio < 1 ? '100%' : 'auto',
-              maxHeight: isFullscreen ? '90vh' : '65vh',
+              maxHeight: isFullscreen ? '90vh' : '70vh',
               maxWidth: isFullscreen ? '90vw' : '100%',
-              minHeight: '200px',
-              minWidth: '150px',
+              minHeight: '250px',
+              minWidth: '180px',
               backgroundColor: project.background.color,
             }}
           >
@@ -120,18 +161,19 @@ export const VideoPreview = forwardRef<HTMLDivElement, VideoPreviewProps>(
               />
             )}
 
-            {/* Text Content - Always Visible */}
+            {/* Text Container */}
             <div 
+              ref={containerRef}
               className={cn(
-                'absolute inset-0 flex overflow-hidden',
-                project.animation.direction === 'up' ? 'flex-col justify-center items-center' : 'flex-row items-center',
+                'absolute inset-0 overflow-hidden flex',
+                project.animation.direction === 'up' ? 'flex-col items-center' : 'items-center',
               )}
             >
               <div 
+                ref={textRef}
                 style={textStyle}
                 className={cn(
-                  'w-full',
-                  !project.text.content && 'text-muted-foreground/50 italic'
+                  !project.text.content && 'text-white/30 italic'
                 )}
               >
                 {displayContent}
@@ -139,8 +181,13 @@ export const VideoPreview = forwardRef<HTMLDivElement, VideoPreviewProps>(
             </div>
 
             {/* Canvas Size Label */}
-            <div className="absolute bottom-2 left-2 px-2 py-1 rounded-md bg-black/50 text-white text-xs font-mono">
-              {canvasSize.width} × {canvasSize.height}
+            <div className="absolute bottom-2 left-2 px-2 py-0.5 rounded bg-black/60 text-white text-[10px] font-mono">
+              {canvasSize.width}×{canvasSize.height}
+            </div>
+
+            {/* Progress indicator */}
+            <div className="absolute bottom-2 right-2 px-2 py-0.5 rounded bg-black/60 text-white text-[10px] font-mono">
+              {currentTime.toFixed(1)}s / {duration}s
             </div>
           </div>
 
@@ -148,15 +195,15 @@ export const VideoPreview = forwardRef<HTMLDivElement, VideoPreviewProps>(
           <button
             onClick={toggleFullscreen}
             className={cn(
-              'absolute p-2 rounded-xl bg-card/80 backdrop-blur-sm border border-border',
+              'absolute p-2 rounded-lg bg-card/90 backdrop-blur-sm border border-border',
               'hover:bg-card transition-colors',
-              isFullscreen ? 'top-4 right-4' : 'top-6 right-6'
+              isFullscreen ? 'top-4 right-4' : 'top-2 right-2'
             )}
           >
             {isFullscreen ? (
-              <Minimize2 className="w-5 h-5" />
+              <Minimize2 className="w-4 h-4" />
             ) : (
-              <Maximize2 className="w-5 h-5" />
+              <Maximize2 className="w-4 h-4" />
             )}
           </button>
         </div>

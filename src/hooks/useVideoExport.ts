@@ -64,42 +64,45 @@ export function useVideoExport() {
 
       mediaRecorder.start();
 
-      // Render frames
-      const startTime = performance.now();
-      const scrollDuration = (21 - project.animation.speed) * 1000;
+      // Preload background image
+      let bgImage: HTMLImageElement | null = null;
+      if (project.background.image) {
+        bgImage = new Image();
+        bgImage.src = project.background.image;
+        await new Promise(resolve => {
+          bgImage!.onload = resolve;
+          bgImage!.onerror = resolve;
+        });
+      }
 
+      // Render frames with movie-credits style animation
       for (let frame = 0; frame < totalFrames; frame++) {
         if (abortRef.current) {
           mediaRecorder.stop();
           throw new Error('Export cancelled');
         }
 
-        const currentTime = (frame / fps) * 1000;
-        const scrollProgress = (currentTime % scrollDuration) / scrollDuration;
+        const progress = frame / totalFrames;
 
         // Draw background
         ctx.fillStyle = project.background.color;
         ctx.fillRect(0, 0, width, height);
 
-        // Draw background image if exists
-        if (project.background.image) {
-          const img = new Image();
-          img.src = project.background.image;
-          if (img.complete) {
-            ctx.globalAlpha = project.background.opacity / 100;
-            if (project.background.blur > 0) {
-              ctx.filter = `blur(${project.background.blur}px)`;
-            }
-            const scale = Math.max(width / img.width, height / img.height);
-            const x = (width - img.width * scale) / 2;
-            const y = (height - img.height * scale) / 2;
-            ctx.drawImage(img, x, y, img.width * scale, img.height * scale);
-            ctx.filter = 'none';
-            ctx.globalAlpha = 1;
+        // Draw background image
+        if (bgImage && bgImage.complete) {
+          ctx.save();
+          ctx.globalAlpha = project.background.opacity / 100;
+          if (project.background.blur > 0) {
+            ctx.filter = `blur(${project.background.blur}px)`;
           }
+          const scale = Math.max(width / bgImage.width, height / bgImage.height);
+          const x = (width - bgImage.width * scale) / 2;
+          const y = (height - bgImage.height * scale) / 2;
+          ctx.drawImage(bgImage, x, y, bgImage.width * scale, bgImage.height * scale);
+          ctx.restore();
         }
 
-        // Draw text
+        // Draw text with movie credits animation
         ctx.fillStyle = project.text.color;
         ctx.font = `${project.text.isItalic ? 'italic ' : ''}${project.text.isBold ? 'bold ' : ''}${project.text.fontSize}px ${project.text.fontFamily}`;
         ctx.textAlign = project.text.textAlign;
@@ -107,43 +110,53 @@ export function useVideoExport() {
         const lines = project.text.content.split('\n');
         const lineHeight = project.text.fontSize * project.text.lineHeight;
         const totalTextHeight = lines.length * lineHeight;
+        
+        // Calculate text container width
+        const containerWidth = (width * project.text.containerWidth) / 100;
+        const paddingX = project.text.paddingX;
 
         let textX = width / 2;
-        if (project.text.textAlign === 'left') textX = 50;
-        if (project.text.textAlign === 'right') textX = width - 50;
+        if (project.text.textAlign === 'left') textX = (width - containerWidth) / 2 + paddingX;
+        if (project.text.textAlign === 'right') textX = (width + containerWidth) / 2 - paddingX;
 
-        // Calculate scroll position
+        // Movie credits style: text scrolls from bottom to top
+        const totalScrollDistance = height + totalTextHeight;
         let offsetY = 0;
         let offsetX = 0;
 
         if (project.animation.direction === 'up') {
-          offsetY = height + scrollProgress * (totalTextHeight + height * 2) - height;
+          // Start at bottom of screen, scroll to above screen
+          const startY = height;
+          offsetY = startY - (progress * totalScrollDistance);
         } else if (project.animation.direction === 'left') {
           const textWidth = Math.max(...lines.map(l => ctx.measureText(l).width));
-          offsetX = width + scrollProgress * (textWidth + width * 2) - width;
+          const totalDistance = width + textWidth;
+          offsetX = width - (progress * totalDistance);
         } else {
           const textWidth = Math.max(...lines.map(l => ctx.measureText(l).width));
-          offsetX = -textWidth - width + scrollProgress * (textWidth + width * 2);
+          const totalDistance = width + textWidth;
+          offsetX = -textWidth + (progress * totalDistance);
         }
 
         lines.forEach((line, i) => {
-          const y = i * lineHeight + lineHeight - offsetY;
+          const y = i * lineHeight + lineHeight + offsetY;
           const x = textX - offsetX;
           
-          if (project.text.letterSpacing !== 0) {
-            // Draw with letter spacing
-            const chars = line.split('');
-            let currentX = x;
-            if (project.text.textAlign === 'center') {
-              const totalWidth = chars.reduce((acc, char) => acc + ctx.measureText(char).width + project.text.letterSpacing, 0);
-              currentX = x - totalWidth / 2;
+          // Only draw if visible
+          if (project.animation.direction === 'up') {
+            if (y > -lineHeight && y < height + lineHeight) {
+              if (project.text.letterSpacing !== 0) {
+                drawTextWithLetterSpacing(ctx, line, x, y, project.text.letterSpacing, project.text.textAlign);
+              } else {
+                ctx.fillText(line, x, y);
+              }
             }
-            chars.forEach(char => {
-              ctx.fillText(char, currentX, y);
-              currentX += ctx.measureText(char).width + project.text.letterSpacing;
-            });
           } else {
-            ctx.fillText(line, x, y);
+            if (project.text.letterSpacing !== 0) {
+              drawTextWithLetterSpacing(ctx, line, x, y, project.text.letterSpacing, project.text.textAlign);
+            } else {
+              ctx.fillText(line, x, y);
+            }
           }
         });
 
@@ -189,4 +202,29 @@ export function useVideoExport() {
     exportVideo,
     cancelExport,
   };
+}
+
+function drawTextWithLetterSpacing(
+  ctx: CanvasRenderingContext2D,
+  text: string,
+  x: number,
+  y: number,
+  letterSpacing: number,
+  textAlign: CanvasTextAlign
+) {
+  const chars = text.split('');
+  let currentX = x;
+  
+  if (textAlign === 'center') {
+    const totalWidth = chars.reduce((acc, char) => acc + ctx.measureText(char).width + letterSpacing, 0) - letterSpacing;
+    currentX = x - totalWidth / 2;
+  } else if (textAlign === 'right') {
+    const totalWidth = chars.reduce((acc, char) => acc + ctx.measureText(char).width + letterSpacing, 0) - letterSpacing;
+    currentX = x - totalWidth;
+  }
+  
+  chars.forEach(char => {
+    ctx.fillText(char, currentX, y);
+    currentX += ctx.measureText(char).width + letterSpacing;
+  });
 }
