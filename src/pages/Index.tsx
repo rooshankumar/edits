@@ -14,8 +14,8 @@ import { ExportQuality } from '@/types/video-project';
 export default function Index() {
   const {
     project, savedProjects, updateProject, updateText, updateBackground,
-    updateAnimation, updateAudio, setCanvasFormat, saveProject, loadProject, 
-    deleteProject, newProject, duplicateProject,
+    updateAnimation, updateAudio, updateWatermark, updateOverlay, updateEnding,
+    setCanvasFormat, saveProject, loadProject, deleteProject, newProject, duplicateProject,
   } = useVideoProject();
 
   const { exportState, exportVideo, cancelExport } = useVideoExport();
@@ -26,9 +26,12 @@ export default function Index() {
   const animationRef = useRef<number | null>(null);
   const startTimeRef = useRef<number | null>(null);
 
-  const duration = project.animation.duration;
+  // Total duration including ending
+  const mainDuration = project.animation.duration;
+  const endingDuration = project.ending.enabled ? project.ending.duration : 0;
+  const totalDuration = mainDuration + endingDuration;
 
-  // Animation loop
+  // Animation loop - uses the EXACT same timing as export
   useEffect(() => {
     if (isPlaying) {
       startTimeRef.current = performance.now() - (currentTime * 1000);
@@ -37,13 +40,13 @@ export default function Index() {
         if (!startTimeRef.current) startTimeRef.current = now;
         const elapsed = (now - startTimeRef.current) / 1000;
         
-        if (elapsed >= duration) {
+        if (elapsed >= totalDuration) {
           if (project.animation.isLooping) {
             startTimeRef.current = now;
             setCurrentTime(0);
           } else {
             setIsPlaying(false);
-            setCurrentTime(duration);
+            setCurrentTime(totalDuration);
             return;
           }
         } else {
@@ -61,15 +64,15 @@ export default function Index() {
         }
       };
     }
-  }, [isPlaying, duration, project.animation.isLooping]);
+  }, [isPlaying, totalDuration, project.animation.isLooping]);
 
   const handlePlayPause = useCallback(() => {
-    if (!isPlaying && currentTime >= duration) {
+    if (!isPlaying && currentTime >= totalDuration) {
       setCurrentTime(0);
       startTimeRef.current = null;
     }
     setIsPlaying(!isPlaying);
-  }, [isPlaying, currentTime, duration]);
+  }, [isPlaying, currentTime, totalDuration]);
 
   const handleReset = useCallback(() => {
     setIsPlaying(false);
@@ -82,19 +85,19 @@ export default function Index() {
     startTimeRef.current = performance.now() - (time * 1000);
   }, []);
 
-  const handleExport = (quality: ExportQuality, exportDuration: number) => {
-    if (previewRef.current) exportVideo(project, previewRef.current, quality, exportDuration);
+  const handleExport = (quality: ExportQuality) => {
+    if (previewRef.current) exportVideo(project, previewRef.current, quality);
   };
 
   return (
     <div className="h-screen flex flex-col bg-background overflow-hidden">
-      {/* Header */}
-      <header className="h-12 flex items-center justify-between px-3 border-b border-border bg-card/80 backdrop-blur-sm shrink-0">
-        <div className="flex items-center gap-2">
-          <div className="w-7 h-7 rounded-lg gradient-primary flex items-center justify-center">
-            <Sparkles className="w-3.5 h-3.5 text-white" />
+      {/* Header - More Compact */}
+      <header className="h-10 flex items-center justify-between px-2 border-b border-border bg-card/80 backdrop-blur-sm shrink-0">
+        <div className="flex items-center gap-1.5">
+          <div className="w-6 h-6 rounded-lg gradient-primary flex items-center justify-center">
+            <Sparkles className="w-3 h-3 text-white" />
           </div>
-          <h1 className="text-sm font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
+          <h1 className="text-xs font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
             ScrollVid
           </h1>
         </div>
@@ -113,8 +116,8 @@ export default function Index() {
 
       {/* Main Editor Layout */}
       <div className="flex-1 flex overflow-hidden">
-        {/* Left Sidebar - Compact Editor */}
-        <aside className="w-72 lg:w-80 border-r border-border bg-card shrink-0 overflow-hidden">
+        {/* Left Sidebar - More Compact (max 260px) */}
+        <aside className="w-60 max-w-[260px] border-r border-border bg-card shrink-0 overflow-hidden">
           <CompactEditor
             project={project}
             onCanvasFormatChange={setCanvasFormat}
@@ -122,29 +125,33 @@ export default function Index() {
             onBackgroundChange={updateBackground}
             onAnimationChange={updateAnimation}
             onAudioChange={updateAudio}
+            onWatermarkChange={updateWatermark}
+            onOverlayChange={updateOverlay}
+            onEndingChange={updateEnding}
           />
         </aside>
 
         {/* Main Preview Area */}
         <main className="flex-1 flex flex-col min-w-0 bg-muted/30">
-          {/* Preview */}
-          <div className="flex-1 flex items-center justify-center p-4 min-h-0">
+          {/* Preview - Reduced max height */}
+          <div className="flex-1 flex items-center justify-center p-3 min-h-0">
             <VideoPreview 
               ref={previewRef} 
               project={project} 
               isPlaying={isPlaying} 
               currentTime={currentTime}
-              duration={duration}
+              duration={mainDuration}
+              totalDuration={totalDuration}
             />
           </div>
 
-          {/* Bottom Controls */}
-          <div className="shrink-0 border-t border-border bg-card/80 backdrop-blur-sm p-3 space-y-2">
+          {/* Bottom Controls - More Compact */}
+          <div className="shrink-0 border-t border-border bg-card/80 backdrop-blur-sm p-2 space-y-1.5">
             {/* Timeline */}
-            <div className="max-w-xl mx-auto w-full">
+            <div className="max-w-lg mx-auto w-full">
               <TimelineBar 
                 currentTime={currentTime}
-                duration={duration}
+                duration={totalDuration}
                 isPlaying={isPlaying}
                 onSeek={handleSeek}
               />

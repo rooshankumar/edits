@@ -1,5 +1,10 @@
 import { useState, useCallback, useEffect } from 'react';
-import { VideoProject, DEFAULT_PROJECT, CanvasFormat, TextSettings, BackgroundSettings, AnimationSettings, AudioSettings } from '@/types/video-project';
+import { 
+  VideoProject, DEFAULT_PROJECT, CanvasFormat, 
+  TextSettings, BackgroundSettings, AnimationSettings, AudioSettings,
+  WatermarkSettings, OverlayTextSettings, EndingSettings,
+  calculateDurationFromWPM, WPM_PRESETS
+} from '@/types/video-project';
 
 const STORAGE_KEY = 'scrolling-video-projects';
 const CURRENT_PROJECT_KEY = 'scrolling-video-current';
@@ -12,12 +17,15 @@ export function useVideoProject() {
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        // Ensure new fields exist with defaults
         return {
           ...DEFAULT_PROJECT,
           ...parsed,
           text: { ...DEFAULT_PROJECT.text, ...parsed.text },
           audio: { ...DEFAULT_PROJECT.audio, ...parsed.audio },
+          animation: { ...DEFAULT_PROJECT.animation, ...parsed.animation },
+          watermark: { ...DEFAULT_PROJECT.watermark, ...parsed.watermark },
+          overlay: { ...DEFAULT_PROJECT.overlay, ...parsed.overlay },
+          ending: { ...DEFAULT_PROJECT.ending, ...parsed.ending },
           id: parsed.id || generateId(),
           createdAt: parsed.createdAt || Date.now(),
           updatedAt: parsed.updatedAt || Date.now(),
@@ -65,11 +73,27 @@ export function useVideoProject() {
   }, []);
 
   const updateText = useCallback((updates: Partial<TextSettings>) => {
-    setProject(prev => ({
-      ...prev,
-      text: { ...prev.text, ...updates },
-      updatedAt: Date.now(),
-    }));
+    setProject(prev => {
+      const newText = { ...prev.text, ...updates };
+      const wordCount = newText.content.split(/\s+/).filter(w => w.length > 0).length;
+      
+      // Auto-recalculate duration if WPM preset is not custom
+      if (prev.animation.wpmPreset !== 'custom' && updates.content !== undefined) {
+        const newDuration = calculateDurationFromWPM(wordCount, prev.animation.targetWPM);
+        return {
+          ...prev,
+          text: newText,
+          animation: { ...prev.animation, duration: newDuration },
+          updatedAt: Date.now(),
+        };
+      }
+      
+      return {
+        ...prev,
+        text: newText,
+        updatedAt: Date.now(),
+      };
+    });
   }, []);
 
   const updateBackground = useCallback((updates: Partial<BackgroundSettings>) => {
@@ -81,17 +105,68 @@ export function useVideoProject() {
   }, []);
 
   const updateAnimation = useCallback((updates: Partial<AnimationSettings>) => {
-    setProject(prev => ({
-      ...prev,
-      animation: { ...prev.animation, ...updates },
-      updatedAt: Date.now(),
-    }));
+    setProject(prev => {
+      const newAnimation = { ...prev.animation, ...updates };
+      
+      // If WPM preset changed, recalculate duration
+      if (updates.wpmPreset && updates.wpmPreset !== 'custom') {
+        const wordCount = prev.text.content.split(/\s+/).filter(w => w.length > 0).length;
+        const targetWPM = WPM_PRESETS[updates.wpmPreset].wpm;
+        const newDuration = calculateDurationFromWPM(wordCount, targetWPM);
+        return {
+          ...prev,
+          animation: { ...newAnimation, targetWPM, duration: newDuration },
+          updatedAt: Date.now(),
+        };
+      }
+      
+      // If target WPM changed directly, recalculate duration
+      if (updates.targetWPM !== undefined && newAnimation.wpmPreset !== 'custom') {
+        const wordCount = prev.text.content.split(/\s+/).filter(w => w.length > 0).length;
+        const newDuration = calculateDurationFromWPM(wordCount, updates.targetWPM);
+        return {
+          ...prev,
+          animation: { ...newAnimation, duration: newDuration },
+          updatedAt: Date.now(),
+        };
+      }
+      
+      return {
+        ...prev,
+        animation: newAnimation,
+        updatedAt: Date.now(),
+      };
+    });
   }, []);
 
   const updateAudio = useCallback((updates: Partial<AudioSettings>) => {
     setProject(prev => ({
       ...prev,
       audio: { ...prev.audio, ...updates },
+      updatedAt: Date.now(),
+    }));
+  }, []);
+
+  const updateWatermark = useCallback((updates: Partial<WatermarkSettings>) => {
+    setProject(prev => ({
+      ...prev,
+      watermark: { ...prev.watermark, ...updates },
+      updatedAt: Date.now(),
+    }));
+  }, []);
+
+  const updateOverlay = useCallback((updates: Partial<OverlayTextSettings>) => {
+    setProject(prev => ({
+      ...prev,
+      overlay: { ...prev.overlay, ...updates },
+      updatedAt: Date.now(),
+    }));
+  }, []);
+
+  const updateEnding = useCallback((updates: Partial<EndingSettings>) => {
+    setProject(prev => ({
+      ...prev,
+      ending: { ...prev.ending, ...updates },
       updatedAt: Date.now(),
     }));
   }, []);
@@ -120,6 +195,10 @@ export function useVideoProject() {
         ...found,
         text: { ...DEFAULT_PROJECT.text, ...found.text },
         audio: { ...DEFAULT_PROJECT.audio, ...found.audio },
+        animation: { ...DEFAULT_PROJECT.animation, ...found.animation },
+        watermark: { ...DEFAULT_PROJECT.watermark, ...found.watermark },
+        overlay: { ...DEFAULT_PROJECT.overlay, ...found.overlay },
+        ending: { ...DEFAULT_PROJECT.ending, ...found.ending },
       });
     }
   }, [savedProjects]);
@@ -155,6 +234,9 @@ export function useVideoProject() {
     updateBackground,
     updateAnimation,
     updateAudio,
+    updateWatermark,
+    updateOverlay,
+    updateEnding,
     setCanvasFormat,
     saveProject,
     loadProject,

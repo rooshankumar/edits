@@ -1,21 +1,15 @@
 import { useState } from 'react';
-import { Download, X, Loader2 } from 'lucide-react';
+import { Download, Loader2 } from 'lucide-react';
 import { VideoProject, ExportQuality } from '@/types/video-project';
 import { Button } from '@/components/ui/button';
-import { Slider } from '@/components/ui/slider';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
 
 interface ExportDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   project: VideoProject;
-  onExport: (quality: ExportQuality, duration: number) => void;
+  onExport: (quality: ExportQuality) => void;
   isExporting: boolean;
   progress: number;
   onCancel: () => void;
@@ -24,119 +18,63 @@ interface ExportDialogProps {
 const qualities: { value: ExportQuality; label: string; desc: string }[] = [
   { value: 'standard', label: 'Standard', desc: '720p • Fast' },
   { value: 'hd', label: 'HD', desc: '1080p • Balanced' },
-  { value: 'ultra', label: 'Ultra', desc: '1080p 60fps • Best' },
+  { value: 'ultra', label: 'Ultra', desc: '1080p 60fps' },
 ];
 
-export function ExportDialog({
-  open,
-  onOpenChange,
-  project,
-  onExport,
-  isExporting,
-  progress,
-  onCancel,
-}: ExportDialogProps) {
+export function ExportDialog({ open, onOpenChange, project, onExport, isExporting, progress, onCancel }: ExportDialogProps) {
   const [quality, setQuality] = useState<ExportQuality>('hd');
-  const [duration, setDuration] = useState(project.animation.duration);
 
-  const handleExport = () => {
-    onExport(quality, duration);
-  };
+  const totalDuration = project.animation.duration + (project.ending.enabled ? project.ending.duration : 0);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-sm">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Download className="w-5 h-5 text-primary" />
+          <DialogTitle className="flex items-center gap-2 text-base">
+            <Download className="w-4 h-4 text-primary" />
             Export Video
           </DialogTitle>
         </DialogHeader>
 
         {isExporting ? (
-          <div className="py-8 space-y-6">
-            <div className="flex flex-col items-center gap-4">
+          <div className="py-6 space-y-4">
+            <div className="flex flex-col items-center gap-3">
               <div className="relative">
-                <Loader2 className="w-12 h-12 text-primary animate-spin" />
-                <span className="absolute inset-0 flex items-center justify-center text-sm font-bold">
-                  {progress}%
-                </span>
+                <Loader2 className="w-10 h-10 text-primary animate-spin" />
+                <span className="absolute inset-0 flex items-center justify-center text-xs font-bold">{progress}%</span>
               </div>
-              <p className="text-sm text-muted-foreground">
-                Rendering your video...
-              </p>
+              <p className="text-xs text-muted-foreground">Rendering video...</p>
             </div>
-
-            <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
-              <div 
-                className="h-full gradient-primary transition-all duration-300"
-                style={{ width: `${progress}%` }}
-              />
+            <div className="w-full h-1.5 bg-muted rounded-full overflow-hidden">
+              <div className="h-full gradient-primary transition-all" style={{ width: `${progress}%` }} />
             </div>
-
-            <Button
-              variant="outline"
-              onClick={onCancel}
-              className="w-full"
-            >
-              Cancel
-            </Button>
+            <Button variant="outline" onClick={onCancel} className="w-full" size="sm">Cancel</Button>
           </div>
         ) : (
-          <div className="space-y-6 py-4">
-            {/* Quality Selection */}
-            <div className="space-y-3">
-              <label className="text-sm font-medium">Quality</label>
-              <div className="grid grid-cols-3 gap-2">
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <label className="text-xs font-medium">Quality</label>
+              <div className="grid grid-cols-3 gap-1.5">
                 {qualities.map((q) => (
-                  <button
-                    key={q.value}
-                    onClick={() => setQuality(q.value)}
-                    className={cn(
-                      'flex flex-col items-center gap-1 p-3 rounded-xl border-2 transition-all',
-                      quality === q.value
-                        ? 'border-primary bg-primary/10'
-                        : 'border-border hover:border-primary/50'
-                    )}
-                  >
-                    <span className="text-sm font-semibold">{q.label}</span>
-                    <span className="text-[10px] text-muted-foreground">{q.desc}</span>
+                  <button key={q.value} onClick={() => setQuality(q.value)}
+                    className={cn('flex flex-col items-center gap-0.5 p-2 rounded-lg border-2 transition-all text-center',
+                      quality === q.value ? 'border-primary bg-primary/10' : 'border-border hover:border-primary/50')}>
+                    <span className="text-xs font-semibold">{q.label}</span>
+                    <span className="text-[9px] text-muted-foreground">{q.desc}</span>
                   </button>
                 ))}
               </div>
             </div>
 
-            {/* Duration */}
-            <div className="space-y-3">
-              <div className="flex justify-between">
-                <label className="text-sm font-medium">Duration</label>
-                <span className="text-sm font-mono text-primary">{duration}s</span>
-              </div>
-              <Slider
-                value={[duration]}
-                onValueChange={([v]) => setDuration(v)}
-                min={5}
-                max={60}
-                step={5}
-              />
-              <div className="flex justify-between text-xs text-muted-foreground">
-                <span>5s</span>
-                <span>60s</span>
-              </div>
+            <div className="p-2 rounded-lg bg-muted/50 text-xs text-center">
+              <span className="font-medium">{totalDuration}s</span>
+              <span className="text-muted-foreground"> • {project.ending.enabled ? 'With ending card' : 'No ending'}</span>
             </div>
 
-            {/* Export Button */}
-            <Button
-              onClick={handleExport}
-              className="w-full gap-2 gradient-primary text-white"
-            >
-              <Download className="w-4 h-4" />
-              Export as WebM
+            <Button onClick={() => onExport(quality)} className="w-full gap-2 gradient-primary text-white" size="sm">
+              <Download className="w-3 h-3" />
+              Export WebM
             </Button>
-
-            <p className="text-xs text-center text-muted-foreground">
-              Video will be exported in WebM format for best browser compatibility
-            </p>
           </div>
         )}
       </DialogContent>
