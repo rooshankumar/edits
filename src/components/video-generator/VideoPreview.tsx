@@ -8,10 +8,11 @@ interface VideoPreviewProps {
   isPlaying: boolean;
   currentTime: number;
   duration: number;
+  totalDuration: number;
 }
 
 export const VideoPreview = forwardRef<HTMLDivElement, VideoPreviewProps>(
-  ({ project, isPlaying, currentTime, duration }, ref) => {
+  ({ project, isPlaying, currentTime, duration, totalDuration }, ref) => {
     const [isFullscreen, setIsFullscreen] = useState(false);
     const textRef = useRef<HTMLDivElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
@@ -19,15 +20,15 @@ export const VideoPreview = forwardRef<HTMLDivElement, VideoPreviewProps>(
     const canvasSize = CANVAS_SIZES[project.canvasFormat];
     const aspectRatio = canvasSize.width / canvasSize.height;
 
-    // Calculate animation progress (0 to 1)
-    const progress = duration > 0 ? currentTime / duration : 0;
+    // Check if we're in the ending phase
+    const isEnding = project.ending.enabled && currentTime >= duration;
+    const scrollProgress = isEnding ? 1 : (duration > 0 ? currentTime / duration : 0);
 
     // Handle audio playback
     useEffect(() => {
       if (audioRef.current && project.audio.file) {
         audioRef.current.volume = project.audio.volume / 100;
         audioRef.current.loop = project.audio.loop;
-        
         if (isPlaying) {
           audioRef.current.currentTime = currentTime;
           audioRef.current.play().catch(() => {});
@@ -37,20 +38,16 @@ export const VideoPreview = forwardRef<HTMLDivElement, VideoPreviewProps>(
       }
     }, [isPlaying, project.audio.file, project.audio.volume, project.audio.loop]);
 
-    // Movie credits style animation calculation
-    // Text starts below the screen and scrolls up until it's above the screen
+    // Movie credits style animation
     const getTransformStyle = (): React.CSSProperties => {
       const containerHeight = containerRef.current?.offsetHeight || 500;
       const textHeight = textRef.current?.offsetHeight || 300;
-      
-      // Total distance: from bottom of screen to top (off screen)
       const totalScrollDistance = containerHeight + textHeight;
       
       switch (project.animation.direction) {
         case 'up': {
-          // Start at bottom (containerHeight), end at top (-textHeight)
           const startY = containerHeight;
-          const currentY = startY - (progress * totalScrollDistance);
+          const currentY = startY - (scrollProgress * totalScrollDistance);
           return { transform: `translateY(${currentY}px)` };
         }
         case 'left': {
@@ -58,7 +55,7 @@ export const VideoPreview = forwardRef<HTMLDivElement, VideoPreviewProps>(
           const textWidth = textRef.current?.offsetWidth || 300;
           const totalDistance = containerWidth + textWidth;
           const startX = containerWidth;
-          const currentX = startX - (progress * totalDistance);
+          const currentX = startX - (scrollProgress * totalDistance);
           return { transform: `translateX(${currentX}px)` };
         }
         case 'right': {
@@ -66,7 +63,7 @@ export const VideoPreview = forwardRef<HTMLDivElement, VideoPreviewProps>(
           const textWidth = textRef.current?.offsetWidth || 300;
           const totalDistance = containerWidth + textWidth;
           const startX = -textWidth;
-          const currentX = startX + (progress * totalDistance);
+          const currentX = startX + (scrollProgress * totalDistance);
           return { transform: `translateX(${currentX}px)` };
         }
         default:
@@ -92,10 +89,6 @@ export const VideoPreview = forwardRef<HTMLDivElement, VideoPreviewProps>(
       ...getTransformStyle(),
     };
 
-    const toggleFullscreen = () => {
-      setIsFullscreen(!isFullscreen);
-    };
-
     useEffect(() => {
       const handleEsc = (e: KeyboardEvent) => {
         if (e.key === 'Escape') setIsFullscreen(false);
@@ -106,105 +99,98 @@ export const VideoPreview = forwardRef<HTMLDivElement, VideoPreviewProps>(
 
     const displayContent = project.text.content || 'Enter your text...';
 
+    // Watermark position styles
+    const getWatermarkPosition = () => {
+      const p = project.watermark.padding;
+      switch (project.watermark.position) {
+        case 'top-left': return { top: p, left: p };
+        case 'top-right': return { top: p, right: p };
+        case 'bottom-left': return { bottom: p, left: p };
+        case 'bottom-right': return { bottom: p, right: p };
+      }
+    };
+
     return (
       <>
-        {/* Audio element */}
-        {project.audio.file && (
-          <audio ref={audioRef} src={project.audio.file} />
-        )}
+        {project.audio.file && <audio ref={audioRef} src={project.audio.file} />}
 
         <div className={cn(
           'relative w-full h-full flex items-center justify-center',
-          isFullscreen && 'fixed inset-0 z-50 bg-black/95 p-8'
+          isFullscreen && 'fixed inset-0 z-50 bg-black/95 p-4'
         )}>
-          {/* Canvas Container */}
           <div
             ref={ref}
-            className="relative overflow-hidden rounded-xl shadow-medium border border-border/50"
+            className="relative overflow-hidden rounded-lg shadow-medium border border-border/50"
             style={{
               aspectRatio: `${canvasSize.width} / ${canvasSize.height}`,
               width: aspectRatio >= 1 ? '100%' : 'auto',
               height: aspectRatio < 1 ? '100%' : 'auto',
-              maxHeight: isFullscreen ? '90vh' : '70vh',
+              maxHeight: isFullscreen ? '90vh' : '60vh',
               maxWidth: isFullscreen ? '90vw' : '100%',
-              minHeight: '250px',
-              minWidth: '180px',
+              minHeight: '200px',
+              minWidth: '150px',
               backgroundColor: project.background.color,
             }}
           >
-            {/* Background Image */}
+            {/* Background Image/Video */}
             {project.background.image && (
-              <img
-                src={project.background.image}
-                alt=""
-                className="absolute inset-0 w-full h-full object-cover"
-                style={{
-                  filter: `blur(${project.background.blur}px)`,
-                  opacity: project.background.opacity / 100,
-                }}
-              />
+              <img src={project.background.image} alt="" className="absolute inset-0 w-full h-full object-cover"
+                style={{ filter: `blur(${project.background.blur}px)`, opacity: project.background.opacity / 100 }} />
             )}
-
-            {/* Background Video */}
             {project.background.video && (
-              <video
-                src={project.background.video}
-                className="absolute inset-0 w-full h-full object-cover"
-                style={{
-                  filter: `blur(${project.background.blur}px)`,
-                  opacity: project.background.opacity / 100,
-                }}
-                muted
-                loop
-                autoPlay
-                playsInline
-              />
+              <video src={project.background.video} className="absolute inset-0 w-full h-full object-cover"
+                style={{ filter: `blur(${project.background.blur}px)`, opacity: project.background.opacity / 100 }}
+                muted loop autoPlay playsInline />
             )}
 
-            {/* Text Container */}
-            <div 
-              ref={containerRef}
-              className={cn(
-                'absolute inset-0 overflow-hidden flex',
-                project.animation.direction === 'up' ? 'flex-col items-center' : 'items-center',
-              )}
-            >
-              <div 
-                ref={textRef}
-                style={textStyle}
-                className={cn(
-                  !project.text.content && 'text-white/30 italic'
-                )}
-              >
-                {displayContent}
+            {/* Overlay Text */}
+            {project.overlay.enabled && project.overlay.content && (
+              <div className={cn('absolute left-0 right-0 z-10 text-center px-2 py-1',
+                project.overlay.position === 'top' ? 'top-0' : 'bottom-0'
+              )} style={{ backgroundColor: project.overlay.backgroundColor, color: project.overlay.color, fontSize: project.overlay.fontSize }}>
+                {project.overlay.content}
               </div>
-            </div>
+            )}
 
-            {/* Canvas Size Label */}
-            <div className="absolute bottom-2 left-2 px-2 py-0.5 rounded bg-black/60 text-white text-[10px] font-mono">
+            {/* Watermark */}
+            {project.watermark.enabled && project.watermark.image && (
+              <img src={project.watermark.image} alt="" className="absolute z-20"
+                style={{ ...getWatermarkPosition(), width: project.watermark.size, height: 'auto', opacity: project.watermark.opacity / 100 }} />
+            )}
+
+            {/* Scrolling Text or Ending */}
+            {!isEnding ? (
+              <div ref={containerRef} className={cn('absolute inset-0 overflow-hidden flex',
+                project.animation.direction === 'up' ? 'flex-col items-center' : 'items-center')}>
+                <div ref={textRef} style={textStyle} className={cn(!project.text.content && 'text-white/30 italic')}>
+                  {displayContent}
+                </div>
+              </div>
+            ) : (
+              <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 p-8">
+                {project.ending.showLogo && project.ending.logo && (
+                  <img src={project.ending.logo} alt="Logo" className="max-w-[40%] max-h-[30%] object-contain" />
+                )}
+                <p className="text-2xl font-bold text-center" style={{ color: project.text.color }}>{project.ending.ctaText}</p>
+                {project.ending.showQR && project.ending.qrCode && (
+                  <img src={project.ending.qrCode} alt="QR" className="w-24 h-24 bg-white p-2 rounded" />
+                )}
+              </div>
+            )}
+
+            {/* Info Labels */}
+            <div className="absolute bottom-1 left-1 px-1.5 py-0.5 rounded bg-black/60 text-white text-[9px] font-mono">
               {canvasSize.width}×{canvasSize.height}
             </div>
-
-            {/* Progress indicator */}
-            <div className="absolute bottom-2 right-2 px-2 py-0.5 rounded bg-black/60 text-white text-[10px] font-mono">
-              {currentTime.toFixed(1)}s / {duration}s
+            <div className="absolute bottom-1 right-1 px-1.5 py-0.5 rounded bg-black/60 text-white text-[9px] font-mono">
+              {currentTime.toFixed(1)}s / {totalDuration}s
             </div>
           </div>
 
-          {/* Fullscreen Toggle */}
-          <button
-            onClick={toggleFullscreen}
-            className={cn(
-              'absolute p-2 rounded-lg bg-card/90 backdrop-blur-sm border border-border',
-              'hover:bg-card transition-colors',
-              isFullscreen ? 'top-4 right-4' : 'top-2 right-2'
-            )}
-          >
-            {isFullscreen ? (
-              <Minimize2 className="w-4 h-4" />
-            ) : (
-              <Maximize2 className="w-4 h-4" />
-            )}
+          <button onClick={() => setIsFullscreen(!isFullscreen)}
+            className={cn('absolute p-1.5 rounded-lg bg-card/90 border border-border hover:bg-card',
+              isFullscreen ? 'top-2 right-2' : 'top-1 right-1')}>
+            {isFullscreen ? <Minimize2 className="w-3 h-3" /> : <Maximize2 className="w-3 h-3" />}
           </button>
         </div>
       </>

@@ -14,87 +14,75 @@ const QUALITY_SETTINGS: Record<ExportQuality, { bitrate: number; fps: number }> 
 };
 
 export function useVideoExport() {
-  const [exportState, setExportState] = useState<ExportState>({
-    isExporting: false,
-    progress: 0,
-    error: null,
-  });
+  const [exportState, setExportState] = useState<ExportState>({ isExporting: false, progress: 0, error: null });
   const abortRef = useRef(false);
 
-  const exportVideo = useCallback(async (
-    project: VideoProject,
-    previewRef: HTMLDivElement,
-    quality: ExportQuality = 'hd',
-    customDuration?: number
-  ) => {
+  const exportVideo = useCallback(async (project: VideoProject, previewRef: HTMLDivElement, quality: ExportQuality = 'hd') => {
     abortRef.current = false;
     setExportState({ isExporting: true, progress: 0, error: null });
 
     try {
       const { width, height } = CANVAS_SIZES[project.canvasFormat];
       const { bitrate, fps } = QUALITY_SETTINGS[quality];
-      const duration = (customDuration || project.animation.duration) * 1000;
-      const totalFrames = Math.ceil((duration / 1000) * fps);
+      
+      // Use project duration directly - this is the fix for duration consistency
+      const mainDuration = project.animation.duration;
+      const endingDuration = project.ending.enabled ? project.ending.duration : 0;
+      const totalDurationMs = (mainDuration + endingDuration) * 1000;
+      const totalFrames = Math.ceil((totalDurationMs / 1000) * fps);
 
-      // Create offscreen canvas
       const canvas = document.createElement('canvas');
       canvas.width = width;
       canvas.height = height;
       const ctx = canvas.getContext('2d')!;
 
-      // Setup MediaRecorder
       const stream = canvas.captureStream(fps);
-      const mediaRecorder = new MediaRecorder(stream, {
-        mimeType: 'video/webm;codecs=vp9',
-        videoBitsPerSecond: bitrate,
-      });
+      const mediaRecorder = new MediaRecorder(stream, { mimeType: 'video/webm;codecs=vp9', videoBitsPerSecond: bitrate });
 
       const chunks: Blob[] = [];
-      mediaRecorder.ondataavailable = (e) => {
-        if (e.data.size > 0) chunks.push(e.data);
-      };
+      mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data); };
 
       const recordingPromise = new Promise<Blob>((resolve, reject) => {
-        mediaRecorder.onstop = () => {
-          const blob = new Blob(chunks, { type: 'video/webm' });
-          resolve(blob);
-        };
+        mediaRecorder.onstop = () => resolve(new Blob(chunks, { type: 'video/webm' }));
         mediaRecorder.onerror = (e) => reject(e);
       });
 
       mediaRecorder.start();
 
-      // Preload background image
+      // Preload images
       let bgImage: HTMLImageElement | null = null;
-      if (project.background.image) {
-        bgImage = new Image();
-        bgImage.src = project.background.image;
-        await new Promise(resolve => {
-          bgImage!.onload = resolve;
-          bgImage!.onerror = resolve;
-        });
-      }
+      let watermarkImage: HTMLImageElement | null = null;
+      let endingLogo: HTMLImageElement | null = null;
+      let endingQR: HTMLImageElement | null = null;
 
-      // Render frames with movie-credits style animation
+      const loadImage = (src: string): Promise<HTMLImageElement> => new Promise((resolve) => {
+        const img = new Image();
+        img.onload = () => resolve(img);
+        img.onerror = () => resolve(img);
+        img.src = src;
+      });
+
+      if (project.background.image) bgImage = await loadImage(project.background.image);
+      if (project.watermark.enabled && project.watermark.image) watermarkImage = await loadImage(project.watermark.image);
+      if (project.ending.enabled && project.ending.showLogo && project.ending.logo) endingLogo = await loadImage(project.ending.logo);
+      if (project.ending.enabled && project.ending.showQR && project.ending.qrCode) endingQR = await loadImage(project.ending.qrCode);
+
+      // Render frames
       for (let frame = 0; frame < totalFrames; frame++) {
-        if (abortRef.current) {
-          mediaRecorder.stop();
-          throw new Error('Export cancelled');
-        }
+        if (abortRef.current) { mediaRecorder.stop(); throw new Error('Export cancelled'); }
 
-        const progress = frame / totalFrames;
+        const currentTimeSec = frame / fps;
+        const isEnding = project.ending.enabled && currentTimeSec >= mainDuration;
+        const scrollProgress = isEnding ? 1 : (mainDuration > 0 ? currentTimeSec / mainDuration : 0);
 
-        // Draw background
+        // Background
         ctx.fillStyle = project.background.color;
         ctx.fillRect(0, 0, width, height);
 
-        // Draw background image
-        if (bgImage && bgImage.complete) {
+        if (bgImage?.complete) {
           ctx.save();
           ctx.globalAlpha = project.background.opacity / 100;
-          if (project.background.blur > 0) {
-            ctx.filter = `blur(${project.background.blur}px)`;
-          }
+          if (project.background.blur > 0) ctx.filter = `blur(${project.background.blur}px)`;
           const scale = Math.max(width / bgImage.width, height / bgImage.height);
           const x = (width - bgImage.width * scale) / 2;
           const y = (height - bgImage.height * scale) / 2;
@@ -102,78 +90,91 @@ export function useVideoExport() {
           ctx.restore();
         }
 
-        // Draw text with movie credits animation
-        ctx.fillStyle = project.text.color;
-        ctx.font = `${project.text.isItalic ? 'italic ' : ''}${project.text.isBold ? 'bold ' : ''}${project.text.fontSize}px ${project.text.fontFamily}`;
-        ctx.textAlign = project.text.textAlign;
+        if (!isEnding) {
+          // Draw scrolling text
+          ctx.fillStyle = project.text.color;
+          ctx.font = `${project.text.isItalic ? 'italic ' : ''}${project.text.isBold ? 'bold ' : ''}${project.text.fontSize}px ${project.text.fontFamily}`;
+          ctx.textAlign = project.text.textAlign;
 
-        const lines = project.text.content.split('\n');
-        const lineHeight = project.text.fontSize * project.text.lineHeight;
-        const totalTextHeight = lines.length * lineHeight;
-        
-        // Calculate text container width
-        const containerWidth = (width * project.text.containerWidth) / 100;
-        const paddingX = project.text.paddingX;
+          const lines = project.text.content.split('\n');
+          const lineHeight = project.text.fontSize * project.text.lineHeight;
+          const totalTextHeight = lines.length * lineHeight;
+          const containerWidth = (width * project.text.containerWidth) / 100;
+          const paddingX = project.text.paddingX;
 
-        let textX = width / 2;
-        if (project.text.textAlign === 'left') textX = (width - containerWidth) / 2 + paddingX;
-        if (project.text.textAlign === 'right') textX = (width + containerWidth) / 2 - paddingX;
+          let textX = width / 2;
+          if (project.text.textAlign === 'left') textX = (width - containerWidth) / 2 + paddingX;
+          if (project.text.textAlign === 'right') textX = (width + containerWidth) / 2 - paddingX;
 
-        // Movie credits style: text scrolls from bottom to top
-        const totalScrollDistance = height + totalTextHeight;
-        let offsetY = 0;
-        let offsetX = 0;
+          const totalScrollDistance = height + totalTextHeight;
+          let offsetY = height - (scrollProgress * totalScrollDistance);
 
-        if (project.animation.direction === 'up') {
-          // Start at bottom of screen, scroll to above screen
-          const startY = height;
-          offsetY = startY - (progress * totalScrollDistance);
-        } else if (project.animation.direction === 'left') {
-          const textWidth = Math.max(...lines.map(l => ctx.measureText(l).width));
-          const totalDistance = width + textWidth;
-          offsetX = width - (progress * totalDistance);
+          lines.forEach((line, i) => {
+            const y = i * lineHeight + lineHeight + offsetY;
+            if (y > -lineHeight && y < height + lineHeight) {
+              ctx.fillText(line, textX, y);
+            }
+          });
         } else {
-          const textWidth = Math.max(...lines.map(l => ctx.measureText(l).width));
-          const totalDistance = width + textWidth;
-          offsetX = -textWidth + (progress * totalDistance);
+          // Draw ending card
+          ctx.textAlign = 'center';
+          ctx.fillStyle = project.text.color;
+          
+          let yPos = height / 2 - 50;
+          
+          if (endingLogo?.complete) {
+            const logoSize = Math.min(width * 0.3, 200);
+            const logoAspect = endingLogo.width / endingLogo.height;
+            const logoW = logoSize;
+            const logoH = logoSize / logoAspect;
+            ctx.drawImage(endingLogo, (width - logoW) / 2, yPos - logoH, logoW, logoH);
+            yPos += 20;
+          }
+
+          ctx.font = `bold ${Math.round(project.text.fontSize * 1.2)}px ${project.text.fontFamily}`;
+          ctx.fillText(project.ending.ctaText, width / 2, yPos + 30);
+
+          if (endingQR?.complete) {
+            const qrSize = 100;
+            ctx.drawImage(endingQR, (width - qrSize) / 2, yPos + 60, qrSize, qrSize);
+          }
         }
 
-        lines.forEach((line, i) => {
-          const y = i * lineHeight + lineHeight + offsetY;
-          const x = textX - offsetX;
-          
-          // Only draw if visible
-          if (project.animation.direction === 'up') {
-            if (y > -lineHeight && y < height + lineHeight) {
-              if (project.text.letterSpacing !== 0) {
-                drawTextWithLetterSpacing(ctx, line, x, y, project.text.letterSpacing, project.text.textAlign);
-              } else {
-                ctx.fillText(line, x, y);
-              }
-            }
-          } else {
-            if (project.text.letterSpacing !== 0) {
-              drawTextWithLetterSpacing(ctx, line, x, y, project.text.letterSpacing, project.text.textAlign);
-            } else {
-              ctx.fillText(line, x, y);
-            }
-          }
-        });
+        // Overlay text
+        if (project.overlay.enabled && project.overlay.content) {
+          ctx.fillStyle = project.overlay.backgroundColor;
+          const overlayH = project.overlay.fontSize + 20;
+          const overlayY = project.overlay.position === 'top' ? 0 : height - overlayH;
+          ctx.fillRect(0, overlayY, width, overlayH);
+          ctx.fillStyle = project.overlay.color;
+          ctx.font = `${project.overlay.fontSize}px sans-serif`;
+          ctx.textAlign = 'center';
+          ctx.fillText(project.overlay.content, width / 2, overlayY + overlayH / 2 + project.overlay.fontSize / 3);
+        }
 
-        // Update progress
-        setExportState(prev => ({
-          ...prev,
-          progress: Math.round((frame / totalFrames) * 100),
-        }));
+        // Watermark
+        if (watermarkImage?.complete && project.watermark.enabled) {
+          ctx.save();
+          ctx.globalAlpha = project.watermark.opacity / 100;
+          const wmSize = project.watermark.size;
+          const wmAspect = watermarkImage.width / watermarkImage.height;
+          const wmW = wmSize;
+          const wmH = wmSize / wmAspect;
+          const p = project.watermark.padding;
+          let wmX = p, wmY = p;
+          if (project.watermark.position.includes('right')) wmX = width - wmW - p;
+          if (project.watermark.position.includes('bottom')) wmY = height - wmH - p;
+          ctx.drawImage(watermarkImage, wmX, wmY, wmW, wmH);
+          ctx.restore();
+        }
 
-        // Wait for next frame timing
+        setExportState(prev => ({ ...prev, progress: Math.round((frame / totalFrames) * 100) }));
         await new Promise(resolve => setTimeout(resolve, 1000 / fps / 2));
       }
 
       mediaRecorder.stop();
       const blob = await recordingPromise;
 
-      // Download the video
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -185,46 +186,11 @@ export function useVideoExport() {
 
       setExportState({ isExporting: false, progress: 100, error: null });
     } catch (error) {
-      setExportState({
-        isExporting: false,
-        progress: 0,
-        error: error instanceof Error ? error.message : 'Export failed',
-      });
+      setExportState({ isExporting: false, progress: 0, error: error instanceof Error ? error.message : 'Export failed' });
     }
   }, []);
 
-  const cancelExport = useCallback(() => {
-    abortRef.current = true;
-  }, []);
+  const cancelExport = useCallback(() => { abortRef.current = true; }, []);
 
-  return {
-    exportState,
-    exportVideo,
-    cancelExport,
-  };
-}
-
-function drawTextWithLetterSpacing(
-  ctx: CanvasRenderingContext2D,
-  text: string,
-  x: number,
-  y: number,
-  letterSpacing: number,
-  textAlign: CanvasTextAlign
-) {
-  const chars = text.split('');
-  let currentX = x;
-  
-  if (textAlign === 'center') {
-    const totalWidth = chars.reduce((acc, char) => acc + ctx.measureText(char).width + letterSpacing, 0) - letterSpacing;
-    currentX = x - totalWidth / 2;
-  } else if (textAlign === 'right') {
-    const totalWidth = chars.reduce((acc, char) => acc + ctx.measureText(char).width + letterSpacing, 0) - letterSpacing;
-    currentX = x - totalWidth;
-  }
-  
-  chars.forEach(char => {
-    ctx.fillText(char, currentX, y);
-    currentX += ctx.measureText(char).width + letterSpacing;
-  });
+  return { exportState, exportVideo, cancelExport };
 }

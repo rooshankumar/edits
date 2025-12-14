@@ -3,6 +3,9 @@ export type ScrollDirection = 'up' | 'left' | 'right';
 export type TextAlign = 'left' | 'center' | 'right';
 export type ExportQuality = 'standard' | 'hd' | 'ultra';
 export type ExportFormat = 'webm' | 'gif';
+export type WatermarkPosition = 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
+export type OverlayPosition = 'top' | 'bottom';
+export type WPMPreset = 'beginner' | 'average' | 'comfortable' | 'fast' | 'custom';
 
 export interface TextSettings {
   content: string;
@@ -29,7 +32,8 @@ export interface BackgroundSettings {
 
 export interface AnimationSettings {
   direction: ScrollDirection;
-  speed: number;
+  wpmPreset: WPMPreset;
+  targetWPM: number;
   duration: number;
   isLooping: boolean;
 }
@@ -41,6 +45,34 @@ export interface AudioSettings {
   loop: boolean;
 }
 
+export interface WatermarkSettings {
+  enabled: boolean;
+  image: string | null;
+  position: WatermarkPosition;
+  size: number;
+  opacity: number;
+  padding: number;
+}
+
+export interface OverlayTextSettings {
+  enabled: boolean;
+  content: string;
+  position: OverlayPosition;
+  fontSize: number;
+  color: string;
+  backgroundColor: string;
+}
+
+export interface EndingSettings {
+  enabled: boolean;
+  duration: number;
+  ctaText: string;
+  logo: string | null;
+  qrCode: string | null;
+  showLogo: boolean;
+  showQR: boolean;
+}
+
 export interface VideoProject {
   id: string;
   name: string;
@@ -49,6 +81,9 @@ export interface VideoProject {
   background: BackgroundSettings;
   animation: AnimationSettings;
   audio: AudioSettings;
+  watermark: WatermarkSettings;
+  overlay: OverlayTextSettings;
+  ending: EndingSettings;
   createdAt: number;
   updatedAt: number;
 }
@@ -64,33 +99,25 @@ export const CANVAS_SIZES: Record<CanvasFormat, { width: number; height: number;
   'facebook-cover': { width: 820, height: 312, label: 'FB Cover' },
 };
 
+export const WPM_PRESETS: Record<WPMPreset, { label: string; wpm: number; description: string }> = {
+  beginner: { label: '🐢 Beginner', wpm: 150, description: 'Easy to follow (120-180 WPM)' },
+  average: { label: '📖 Average', wpm: 225, description: 'Standard reading (200-250 WPM)' },
+  comfortable: { label: '🚶 Comfortable', wpm: 275, description: 'Fluent reading (250-300 WPM)' },
+  fast: { label: '🐇 Fast', wpm: 400, description: 'Quick scan (350-450 WPM)' },
+  custom: { label: '⚙️ Custom', wpm: 200, description: 'Set your own speed' },
+};
+
 export const FONT_FAMILIES = [
-  // Clean & Readable (Best for educational content)
   { name: 'Inter', value: 'Inter, sans-serif', category: 'readable' },
   { name: 'Poppins', value: 'Poppins, sans-serif', category: 'readable' },
   { name: 'Montserrat', value: 'Montserrat, sans-serif', category: 'readable' },
   { name: 'Open Sans', value: 'Open Sans, sans-serif', category: 'readable' },
   { name: 'Roboto', value: 'Roboto, sans-serif', category: 'readable' },
-  { name: 'Quicksand', value: 'Quicksand, sans-serif', category: 'readable' },
   { name: 'Raleway', value: 'Raleway, sans-serif', category: 'readable' },
-  // Elegant
   { name: 'Playfair Display', value: 'Playfair Display, serif', category: 'elegant' },
   { name: 'Lora', value: 'Lora, serif', category: 'elegant' },
-  { name: 'Cinzel', value: 'Cinzel, serif', category: 'elegant' },
-  // Display / Bold
-  { name: 'Bebas Neue', value: 'Bebas Neue, sans-serif', category: 'display' },
   { name: 'Oswald', value: 'Oswald, sans-serif', category: 'display' },
-  { name: 'Righteous', value: 'Righteous, sans-serif', category: 'display' },
-  { name: 'Russo One', value: 'Russo One, sans-serif', category: 'display' },
-  { name: 'Bangers', value: 'Bangers, cursive', category: 'display' },
-  { name: 'Orbitron', value: 'Orbitron, sans-serif', category: 'display' },
-  // Script
   { name: 'Dancing Script', value: 'Dancing Script, cursive', category: 'script' },
-  { name: 'Pacifico', value: 'Pacifico, cursive', category: 'script' },
-  { name: 'Caveat', value: 'Caveat, cursive', category: 'script' },
-  { name: 'Lobster', value: 'Lobster, cursive', category: 'script' },
-  { name: 'Permanent Marker', value: 'Permanent Marker, cursive', category: 'script' },
-  { name: 'Shadows Into Light', value: 'Shadows Into Light, cursive', category: 'script' },
 ];
 
 export const DEFAULT_PROJECT: Omit<VideoProject, 'id' | 'createdAt' | 'updatedAt'> = {
@@ -119,7 +146,8 @@ export const DEFAULT_PROJECT: Omit<VideoProject, 'id' | 'createdAt' | 'updatedAt
   },
   animation: {
     direction: 'up',
-    speed: 5,
+    wpmPreset: 'beginner',
+    targetWPM: 150,
     duration: 15,
     isLooping: true,
   },
@@ -129,4 +157,41 @@ export const DEFAULT_PROJECT: Omit<VideoProject, 'id' | 'createdAt' | 'updatedAt
     volume: 80,
     loop: true,
   },
+  watermark: {
+    enabled: false,
+    image: null,
+    position: 'top-right',
+    size: 80,
+    opacity: 80,
+    padding: 16,
+  },
+  overlay: {
+    enabled: false,
+    content: '',
+    position: 'top',
+    fontSize: 24,
+    color: '#ffffff',
+    backgroundColor: 'rgba(0,0,0,0.5)',
+  },
+  ending: {
+    enabled: false,
+    duration: 3,
+    ctaText: 'Follow for more!',
+    logo: null,
+    qrCode: null,
+    showLogo: false,
+    showQR: false,
+  },
 };
+
+// Helper function to calculate duration from WPM
+export function calculateDurationFromWPM(wordCount: number, targetWPM: number): number {
+  if (wordCount === 0 || targetWPM === 0) return 10;
+  return Math.max(5, Math.ceil((wordCount / targetWPM) * 60));
+}
+
+// Helper function to calculate WPM from duration
+export function calculateWPMFromDuration(wordCount: number, duration: number): number {
+  if (duration === 0) return 0;
+  return Math.round((wordCount / duration) * 60);
+}
