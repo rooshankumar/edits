@@ -1,18 +1,19 @@
 import { forwardRef, useState, useEffect, useRef } from 'react';
 import { Maximize2, Minimize2 } from 'lucide-react';
 import { VideoProject, CANVAS_SIZES } from '@/types/video-project';
+import { computeScrollState } from '@/utils/timeline';
 import { cn } from '@/lib/utils';
 
 interface VideoPreviewProps {
   project: VideoProject;
   isPlaying: boolean;
   currentTime: number;
-  duration: number;
+  contentDuration: number;
   totalDuration: number;
 }
 
 export const VideoPreview = forwardRef<HTMLDivElement, VideoPreviewProps>(
-  ({ project, isPlaying, currentTime, duration, totalDuration }, ref) => {
+  ({ project, isPlaying, currentTime, contentDuration, totalDuration }, ref) => {
     const [isFullscreen, setIsFullscreen] = useState(false);
     const textRef = useRef<HTMLDivElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
@@ -20,9 +21,12 @@ export const VideoPreview = forwardRef<HTMLDivElement, VideoPreviewProps>(
     const canvasSize = CANVAS_SIZES[project.canvasFormat];
     const aspectRatio = canvasSize.width / canvasSize.height;
 
-    // Check if we're in the ending phase
-    const isEnding = project.ending.enabled && currentTime >= duration;
-    const scrollProgress = isEnding ? 1 : (duration > 0 ? currentTime / duration : 0);
+    // Use unified scroll state - MATCHES EXPORT EXACTLY
+    const scrollState = computeScrollState(
+      currentTime,
+      contentDuration,
+      project.ending.enabled
+    );
 
     // Handle audio playback
     useEffect(() => {
@@ -38,7 +42,7 @@ export const VideoPreview = forwardRef<HTMLDivElement, VideoPreviewProps>(
       }
     }, [isPlaying, project.audio.file, project.audio.volume, project.audio.loop]);
 
-    // Movie credits style animation
+    // Scroll animation styles - matches export calculation
     const getTransformStyle = (): React.CSSProperties => {
       const containerHeight = containerRef.current?.offsetHeight || 500;
       const textHeight = textRef.current?.offsetHeight || 300;
@@ -46,8 +50,9 @@ export const VideoPreview = forwardRef<HTMLDivElement, VideoPreviewProps>(
       
       switch (project.animation.direction) {
         case 'up': {
+          // Start at bottom (containerHeight), scroll up by progress
           const startY = containerHeight;
-          const currentY = startY - (scrollProgress * totalScrollDistance);
+          const currentY = startY - (scrollState.progress * totalScrollDistance);
           return { transform: `translateY(${currentY}px)` };
         }
         case 'left': {
@@ -55,7 +60,7 @@ export const VideoPreview = forwardRef<HTMLDivElement, VideoPreviewProps>(
           const textWidth = textRef.current?.offsetWidth || 300;
           const totalDistance = containerWidth + textWidth;
           const startX = containerWidth;
-          const currentX = startX - (scrollProgress * totalDistance);
+          const currentX = startX - (scrollState.progress * totalDistance);
           return { transform: `translateX(${currentX}px)` };
         }
         case 'right': {
@@ -63,7 +68,7 @@ export const VideoPreview = forwardRef<HTMLDivElement, VideoPreviewProps>(
           const textWidth = textRef.current?.offsetWidth || 300;
           const totalDistance = containerWidth + textWidth;
           const startX = -textWidth;
-          const currentX = startX + (scrollProgress * totalDistance);
+          const currentX = startX + (scrollState.progress * totalDistance);
           return { transform: `translateX(${currentX}px)` };
         }
         default:
@@ -159,7 +164,7 @@ export const VideoPreview = forwardRef<HTMLDivElement, VideoPreviewProps>(
             )}
 
             {/* Scrolling Text or Ending */}
-            {!isEnding ? (
+            {!scrollState.isEnding ? (
               <div ref={containerRef} className={cn('absolute inset-0 overflow-hidden flex',
                 project.animation.direction === 'up' ? 'flex-col items-center' : 'items-center')}>
                 <div ref={textRef} style={textStyle} className={cn(!project.text.content && 'text-white/30 italic')}>
