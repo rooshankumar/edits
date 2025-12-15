@@ -1,5 +1,6 @@
 import { useState, useCallback, useRef } from 'react';
 import { VideoProject, CANVAS_SIZES, ExportQuality } from '@/types/video-project';
+import { computeTimeline, computeScrollState } from '@/utils/timeline';
 
 interface ExportState {
   isExporting: boolean;
@@ -17,7 +18,7 @@ export function useVideoExport() {
   const [exportState, setExportState] = useState<ExportState>({ isExporting: false, progress: 0, error: null });
   const abortRef = useRef(false);
 
-  const exportVideo = useCallback(async (project: VideoProject, previewRef: HTMLDivElement, quality: ExportQuality = 'hd') => {
+  const exportVideo = useCallback(async (project: VideoProject, _previewRef: HTMLDivElement, quality: ExportQuality = 'hd') => {
     abortRef.current = false;
     setExportState({ isExporting: true, progress: 0, error: null });
 
@@ -25,10 +26,16 @@ export function useVideoExport() {
       const { width, height } = CANVAS_SIZES[project.canvasFormat];
       const { bitrate, fps } = QUALITY_SETTINGS[quality];
       
-      // Use project duration directly - this is the fix for duration consistency
-      const mainDuration = project.animation.duration;
-      const endingDuration = project.ending.enabled ? project.ending.duration : 0;
-      const totalDurationMs = (mainDuration + endingDuration) * 1000;
+      // Use unified timeline engine - SINGLE SOURCE OF TRUTH
+      const timeline = computeTimeline(
+        project.text.content,
+        project.animation.wpmPreset,
+        project.animation.wpmPreset === 'custom' ? project.animation.duration : null,
+        project.ending.enabled,
+        project.ending.duration
+      );
+      
+      const totalDurationMs = timeline.totalDuration * 1000;
       const totalFrames = Math.ceil((totalDurationMs / 1000) * fps);
 
       const canvas = document.createElement('canvas');
@@ -36,8 +43,61 @@ export function useVideoExport() {
       canvas.height = height;
       const ctx = canvas.getContext('2d')!;
 
-      const stream = canvas.captureStream(fps);
-      const mediaRecorder = new MediaRecorder(stream, { mimeType: 'video/webm;codecs=vp9', videoBitsPerSecond: bitrate });
+      // Setup audio if present
+      let audioContext: AudioContext | null = null;
+      let audioBuffer: AudioBuffer | null = null;
+      let audioDestination: MediaStreamAudioDestinationNode | null = null;
+      
+      if (project.audio.file) {
+        try {
+          audioContext = new AudioContext();
+          const audioResponse = await fetch(project.audio.file);
+          const audioArrayBuffer = await audioResponse.arrayBuffer();
+          audioBuffer = await audioContext.decodeAudioData(audioArrayBuffer);
+          audioDestination = audioContext.createMediaStreamDestination();
+        } catch (e) {
+          console.warn('Failed to load audio for export:', e);
+        }
+      }
+
+      // Create video stream
+      const videoStream = canvas.captureStream(fps);
+      
+      // Combine audio and video streams
+      let combinedStream: MediaStream;
+      if (audioDestination) {
+        combinedStream = new MediaStream([
+          ...videoStream.getVideoTracks(),
+          ...audioDestination.stream.getAudioTracks()
+        ]);
+        
+        // Start audio playback
+        if (audioContext && audioBuffer) {
+          const source = audioContext.createBufferSource();
+          source.buffer = audioBuffer;
+          source.loop = project.audio.loop;
+          
+          // Apply volume
+          const gainNode = audioContext.createGain();
+          gainNode.gain.value = project.audio.volume / 100;
+          
+          source.connect(gainNode);
+          gainNode.connect(audioDestination);
+          source.start(0);
+          
+          // Schedule fade out in last 0.5s
+          const fadeStartTime = Math.max(0, timeline.totalDuration - 0.5);
+          gainNode.gain.setValueAtTime(project.audio.volume / 100, audioContext.currentTime + fadeStartTime);
+          gainNode.gain.linearRampToValueAtTime(0, audioContext.currentTime + timeline.totalDuration);
+        }
+      } else {
+        combinedStream = videoStream;
+      }
+
+      const mediaRecorder = new MediaRecorder(combinedStream, { 
+        mimeType: 'video/webm;codecs=vp9', 
+        videoBitsPerSecond: bitrate 
+      });
 
       const chunks: Blob[] = [];
       mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data); };
@@ -67,19 +127,34 @@ export function useVideoExport() {
       if (project.ending.enabled && project.ending.showLogo && project.ending.logo) endingLogo = await loadImage(project.ending.logo);
       if (project.ending.enabled && project.ending.showQR && project.ending.qrCode) endingQR = await loadImage(project.ending.qrCode);
 
+      // Calculate text metrics for scrolling
+      ctx.font = `${project.text.isItalic ? 'italic ' : ''}${project.text.isBold ? 'bold ' : ''}${project.text.fontSize}px ${project.text.fontFamily}`;
+      const lines = project.text.content.split('\n');
+      const lineHeight = project.text.fontSize * project.text.lineHeight;
+      const totalTextHeight = lines.length * lineHeight + project.text.paddingY * 2;
+
       // Render frames
       for (let frame = 0; frame < totalFrames; frame++) {
-        if (abortRef.current) { mediaRecorder.stop(); throw new Error('Export cancelled'); }
+        if (abortRef.current) { 
+          mediaRecorder.stop();
+          if (audioContext) audioContext.close();
+          throw new Error('Export cancelled'); 
+        }
 
         const currentTimeSec = frame / fps;
-        const isEnding = project.ending.enabled && currentTimeSec >= mainDuration;
-        const scrollProgress = isEnding ? 1 : (mainDuration > 0 ? currentTimeSec / mainDuration : 0);
+        
+        // Use unified scroll state calculation - MATCHES PREVIEW EXACTLY
+        const scrollState = computeScrollState(
+          currentTimeSec,
+          timeline.contentDuration,
+          project.ending.enabled
+        );
 
         // Background
         ctx.fillStyle = project.background.color;
         ctx.fillRect(0, 0, width, height);
 
-        if (bgImage?.complete) {
+        if (bgImage?.complete && bgImage.naturalWidth > 0) {
           ctx.save();
           ctx.globalAlpha = project.background.opacity / 100;
           if (project.background.blur > 0) ctx.filter = `blur(${project.background.blur}px)`;
@@ -90,15 +165,12 @@ export function useVideoExport() {
           ctx.restore();
         }
 
-        if (!isEnding) {
-          // Draw scrolling text
+        if (!scrollState.isEnding) {
+          // Draw scrolling text - using same calculation as preview
           ctx.fillStyle = project.text.color;
           ctx.font = `${project.text.isItalic ? 'italic ' : ''}${project.text.isBold ? 'bold ' : ''}${project.text.fontSize}px ${project.text.fontFamily}`;
           ctx.textAlign = project.text.textAlign;
 
-          const lines = project.text.content.split('\n');
-          const lineHeight = project.text.fontSize * project.text.lineHeight;
-          const totalTextHeight = lines.length * lineHeight;
           const containerWidth = (width * project.text.containerWidth) / 100;
           const paddingX = project.text.paddingX;
 
@@ -106,11 +178,13 @@ export function useVideoExport() {
           if (project.text.textAlign === 'left') textX = (width - containerWidth) / 2 + paddingX;
           if (project.text.textAlign === 'right') textX = (width + containerWidth) / 2 - paddingX;
 
+          // Match preview scroll calculation EXACTLY
           const totalScrollDistance = height + totalTextHeight;
-          let offsetY = height - (scrollProgress * totalScrollDistance);
+          const startY = height; // Start off bottom
+          const currentY = startY - (scrollState.progress * totalScrollDistance);
 
           lines.forEach((line, i) => {
-            const y = i * lineHeight + lineHeight + offsetY;
+            const y = currentY + project.text.paddingY + i * lineHeight + lineHeight;
             if (y > -lineHeight && y < height + lineHeight) {
               ctx.fillText(line, textX, y);
             }
@@ -122,7 +196,7 @@ export function useVideoExport() {
           
           let yPos = height / 2 - 50;
           
-          if (endingLogo?.complete) {
+          if (endingLogo?.complete && endingLogo.naturalWidth > 0) {
             const logoSize = Math.min(width * 0.3, 200);
             const logoAspect = endingLogo.width / endingLogo.height;
             const logoW = logoSize;
@@ -134,7 +208,7 @@ export function useVideoExport() {
           ctx.font = `bold ${Math.round(project.text.fontSize * 1.2)}px ${project.text.fontFamily}`;
           ctx.fillText(project.ending.ctaText, width / 2, yPos + 30);
 
-          if (endingQR?.complete) {
+          if (endingQR?.complete && endingQR.naturalWidth > 0) {
             const qrSize = 100;
             ctx.drawImage(endingQR, (width - qrSize) / 2, yPos + 60, qrSize, qrSize);
           }
@@ -153,7 +227,7 @@ export function useVideoExport() {
         }
 
         // Watermark
-        if (watermarkImage?.complete && project.watermark.enabled) {
+        if (watermarkImage?.complete && watermarkImage.naturalWidth > 0 && project.watermark.enabled) {
           ctx.save();
           ctx.globalAlpha = project.watermark.opacity / 100;
           const wmSize = project.watermark.size;
@@ -173,6 +247,8 @@ export function useVideoExport() {
       }
 
       mediaRecorder.stop();
+      if (audioContext) audioContext.close();
+      
       const blob = await recordingPromise;
 
       const url = URL.createObjectURL(blob);

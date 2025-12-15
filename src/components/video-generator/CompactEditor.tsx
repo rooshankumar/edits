@@ -3,14 +3,14 @@ import {
   Type, Palette, Sparkles, Music, ChevronDown, ChevronUp, 
   Bold, Italic, AlignLeft, AlignCenter, AlignRight,
   ArrowUp, ArrowLeft, ArrowRight, RotateCcw, X, Image as ImageIcon, Film,
-  Stamp, Layers, Flag
+  Stamp, Layers, Flag, AlertTriangle
 } from 'lucide-react';
 import { 
   VideoProject, TextSettings, BackgroundSettings, AnimationSettings, AudioSettings,
   WatermarkSettings, OverlayTextSettings, EndingSettings,
-  FONT_FAMILIES, CANVAS_SIZES, CanvasFormat, WPMPreset, WPM_PRESETS,
-  calculateWPMFromDuration
+  FONT_FAMILIES, CANVAS_SIZES, CanvasFormat, WPMPreset, WPM_PRESETS
 } from '@/types/video-project';
+import { TimelineState, getWPMLevel } from '@/utils/timeline';
 import { Textarea } from '@/components/ui/textarea';
 import { Slider } from '@/components/ui/slider';
 import { Switch } from '@/components/ui/switch';
@@ -24,6 +24,7 @@ import { cn } from '@/lib/utils';
 
 interface CompactEditorProps {
   project: VideoProject;
+  timeline: TimelineState;
   onCanvasFormatChange: (format: CanvasFormat) => void;
   onTextChange: (updates: Partial<TextSettings>) => void;
   onBackgroundChange: (updates: Partial<BackgroundSettings>) => void;
@@ -83,6 +84,7 @@ const canvasOptions: { value: CanvasFormat; label: string }[] = [
 
 export function CompactEditor({
   project,
+  timeline,
   onCanvasFormatChange,
   onTextChange,
   onBackgroundChange,
@@ -117,16 +119,8 @@ export function CompactEditor({
     }
   };
 
-  // Calculate WPM
-  const wordCount = project.text.content.split(/\s+/).filter(w => w.length > 0).length;
-  const currentWPM = calculateWPMFromDuration(wordCount, project.animation.duration);
-
-  // WPM warning colors
-  const getWPMColor = () => {
-    if (currentWPM <= 180) return 'text-green-500';
-    if (currentWPM <= 300) return 'text-yellow-500';
-    return 'text-red-500';
-  };
+  // WPM level for color coding
+  const wpmLevel = getWPMLevel(timeline.targetWPM);
 
   return (
     <ScrollArea className="h-full">
@@ -163,7 +157,7 @@ export function CompactEditor({
             className="min-h-[80px] resize-none bg-muted/50 text-xs"
           />
           <p className="text-[9px] text-muted-foreground text-right">
-            {wordCount} words
+            {timeline.wordCount} words
           </p>
 
           {/* Font + Size */}
@@ -289,9 +283,9 @@ export function CompactEditor({
           {/* Direction */}
           <div className="grid grid-cols-3 gap-1">
             {[
-              { value: 'up' as const, icon: ArrowUp, label: '↑' },
-              { value: 'left' as const, icon: ArrowLeft, label: '←' },
-              { value: 'right' as const, icon: ArrowRight, label: '→' },
+              { value: 'up' as const, label: '↑' },
+              { value: 'left' as const, label: '←' },
+              { value: 'right' as const, label: '→' },
             ].map(({ value, label }) => (
               <button
                 key={value}
@@ -308,12 +302,24 @@ export function CompactEditor({
             ))}
           </div>
 
-          {/* WPM Presets */}
+          {/* WPM Display with Color Coding */}
           <div className="p-2 rounded-lg bg-muted/30 space-y-2">
             <div className="flex items-center justify-between">
               <span className="text-[10px] font-medium">Reading Speed</span>
-              <span className={cn('text-xs font-bold', getWPMColor())}>{currentWPM} WPM</span>
+              <div className="flex items-center gap-1">
+                {wpmLevel === 'danger' && <AlertTriangle className="w-3 h-3 text-red-500" />}
+                <span className={cn(
+                  'text-xs font-bold',
+                  wpmLevel === 'good' && 'text-green-500',
+                  wpmLevel === 'warning' && 'text-yellow-500',
+                  wpmLevel === 'danger' && 'text-red-500',
+                )}>
+                  {timeline.targetWPM} WPM
+                </span>
+              </div>
             </div>
+            
+            {/* WPM Presets */}
             <div className="grid grid-cols-2 gap-1">
               {(Object.keys(WPM_PRESETS) as WPMPreset[]).filter(p => p !== 'custom').map((preset) => (
                 <button
@@ -330,17 +336,27 @@ export function CompactEditor({
                 </button>
               ))}
             </div>
+            
             <p className="text-[9px] text-muted-foreground text-center">
               {project.animation.wpmPreset !== 'custom' 
                 ? WPM_PRESETS[project.animation.wpmPreset].description 
                 : 'Manual duration control'}
             </p>
+
+            {/* Auto-calculated duration display */}
+            <div className="text-center py-1 px-2 rounded bg-primary/5 border border-primary/20">
+              <span className="text-[10px] text-muted-foreground">Auto duration: </span>
+              <span className="text-xs font-bold text-primary">{timeline.contentDuration}s</span>
+              {timeline.endingDuration > 0 && (
+                <span className="text-[10px] text-muted-foreground"> + {timeline.endingDuration}s ending</span>
+              )}
+            </div>
           </div>
 
-          {/* Duration with Manual Override */}
+          {/* Manual Duration Override */}
           <div>
             <div className="flex items-center justify-between mb-1">
-              <label className="text-[10px] font-medium">Duration</label>
+              <label className="text-[10px] font-medium">Manual Override</label>
               <button
                 onClick={() => onAnimationChange({ wpmPreset: 'custom' })}
                 className={cn(
@@ -350,33 +366,38 @@ export function CompactEditor({
                     : 'bg-muted/50 text-muted-foreground hover:bg-muted'
                 )}
               >
-                Manual
+                Custom
               </button>
             </div>
-            <div className="flex flex-wrap gap-1 mb-1.5">
-              {durationPresets.map((preset) => (
-                <button
-                  key={preset}
-                  onClick={() => onAnimationChange({ duration: preset, wpmPreset: 'custom' })}
-                  className={cn(
-                    'px-2 py-0.5 rounded text-[10px] font-medium transition-all',
-                    project.animation.duration === preset
-                      ? 'bg-primary text-primary-foreground'
-                      : 'bg-muted/50 text-muted-foreground hover:bg-muted'
-                  )}
-                >
-                  {preset}s
-                </button>
-              ))}
-            </div>
-            <Slider
-              value={[project.animation.duration]}
-              onValueChange={([v]) => onAnimationChange({ duration: v, wpmPreset: 'custom' })}
-              min={3}
-              max={120}
-              step={1}
-            />
-            <p className="text-[9px] text-muted-foreground mt-0.5">{project.animation.duration}s total</p>
+            
+            {project.animation.wpmPreset === 'custom' && (
+              <>
+                <div className="flex flex-wrap gap-1 mb-1.5">
+                  {durationPresets.map((preset) => (
+                    <button
+                      key={preset}
+                      onClick={() => onAnimationChange({ duration: preset })}
+                      className={cn(
+                        'px-2 py-0.5 rounded text-[10px] font-medium transition-all',
+                        project.animation.duration === preset
+                          ? 'bg-primary text-primary-foreground'
+                          : 'bg-muted/50 text-muted-foreground hover:bg-muted'
+                      )}
+                    >
+                      {preset}s
+                    </button>
+                  ))}
+                </div>
+                <Slider
+                  value={[project.animation.duration]}
+                  onValueChange={([v]) => onAnimationChange({ duration: v })}
+                  min={3}
+                  max={120}
+                  step={1}
+                />
+                <p className="text-[9px] text-muted-foreground mt-0.5">{project.animation.duration}s</p>
+              </>
+            )}
           </div>
 
           {/* Loop */}

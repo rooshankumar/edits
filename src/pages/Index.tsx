@@ -10,6 +10,7 @@ import { ThemeToggle } from '@/components/video-generator/ThemeToggle';
 import { ExportDialog } from '@/components/video-generator/ExportDialog';
 import { TimelineBar } from '@/components/video-generator/TimelineBar';
 import { ExportQuality } from '@/types/video-project';
+import { computeTimeline } from '@/utils/timeline';
 
 export default function Index() {
   const {
@@ -26,12 +27,16 @@ export default function Index() {
   const animationRef = useRef<number | null>(null);
   const startTimeRef = useRef<number | null>(null);
 
-  // Total duration including ending
-  const mainDuration = project.animation.duration;
-  const endingDuration = project.ending.enabled ? project.ending.duration : 0;
-  const totalDuration = mainDuration + endingDuration;
+  // Use unified timeline engine - SINGLE SOURCE OF TRUTH
+  const timeline = computeTimeline(
+    project.text.content,
+    project.animation.wpmPreset,
+    project.animation.wpmPreset === 'custom' ? project.animation.duration : null,
+    project.ending.enabled,
+    project.ending.duration
+  );
 
-  // Animation loop - uses the EXACT same timing as export
+  // Animation loop - uses unified timeline
   useEffect(() => {
     if (isPlaying) {
       startTimeRef.current = performance.now() - (currentTime * 1000);
@@ -40,13 +45,13 @@ export default function Index() {
         if (!startTimeRef.current) startTimeRef.current = now;
         const elapsed = (now - startTimeRef.current) / 1000;
         
-        if (elapsed >= totalDuration) {
+        if (elapsed >= timeline.totalDuration) {
           if (project.animation.isLooping) {
             startTimeRef.current = now;
             setCurrentTime(0);
           } else {
             setIsPlaying(false);
-            setCurrentTime(totalDuration);
+            setCurrentTime(timeline.totalDuration);
             return;
           }
         } else {
@@ -64,15 +69,15 @@ export default function Index() {
         }
       };
     }
-  }, [isPlaying, totalDuration, project.animation.isLooping]);
+  }, [isPlaying, timeline.totalDuration, project.animation.isLooping]);
 
   const handlePlayPause = useCallback(() => {
-    if (!isPlaying && currentTime >= totalDuration) {
+    if (!isPlaying && currentTime >= timeline.totalDuration) {
       setCurrentTime(0);
       startTimeRef.current = null;
     }
     setIsPlaying(!isPlaying);
-  }, [isPlaying, currentTime, totalDuration]);
+  }, [isPlaying, currentTime, timeline.totalDuration]);
 
   const handleReset = useCallback(() => {
     setIsPlaying(false);
@@ -91,7 +96,7 @@ export default function Index() {
 
   return (
     <div className="h-screen flex flex-col bg-background overflow-hidden">
-      {/* Header - More Compact */}
+      {/* Header */}
       <header className="h-10 flex items-center justify-between px-2 border-b border-border bg-card/80 backdrop-blur-sm shrink-0">
         <div className="flex items-center gap-1.5">
           <div className="w-6 h-6 rounded-lg gradient-primary flex items-center justify-center">
@@ -116,10 +121,11 @@ export default function Index() {
 
       {/* Main Editor Layout */}
       <div className="flex-1 flex overflow-hidden">
-        {/* Left Sidebar - More Compact (max 260px) */}
+        {/* Left Sidebar */}
         <aside className="w-60 max-w-[260px] border-r border-border bg-card shrink-0 overflow-hidden">
           <CompactEditor
             project={project}
+            timeline={timeline}
             onCanvasFormatChange={setCanvasFormat}
             onTextChange={updateText}
             onBackgroundChange={updateBackground}
@@ -133,25 +139,25 @@ export default function Index() {
 
         {/* Main Preview Area */}
         <main className="flex-1 flex flex-col min-w-0 bg-muted/30">
-          {/* Preview - Reduced max height */}
+          {/* Preview */}
           <div className="flex-1 flex items-center justify-center p-3 min-h-0">
             <VideoPreview 
               ref={previewRef} 
               project={project} 
               isPlaying={isPlaying} 
               currentTime={currentTime}
-              duration={mainDuration}
-              totalDuration={totalDuration}
+              contentDuration={timeline.contentDuration}
+              totalDuration={timeline.totalDuration}
             />
           </div>
 
-          {/* Bottom Controls - More Compact */}
+          {/* Bottom Controls */}
           <div className="shrink-0 border-t border-border bg-card/80 backdrop-blur-sm p-2 space-y-1.5">
             {/* Timeline */}
             <div className="max-w-lg mx-auto w-full">
               <TimelineBar 
                 currentTime={currentTime}
-                duration={totalDuration}
+                duration={timeline.totalDuration}
                 isPlaying={isPlaying}
                 onSeek={handleSeek}
               />
@@ -176,7 +182,8 @@ export default function Index() {
       <ExportDialog 
         open={showExportDialog} 
         onOpenChange={setShowExportDialog} 
-        project={project} 
+        project={project}
+        timeline={timeline}
         onExport={handleExport} 
         isExporting={exportState.isExporting} 
         progress={exportState.progress} 
