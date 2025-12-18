@@ -32,10 +32,10 @@ export function WatermarkControls({ settings, onChange }: WatermarkControlsProps
   };
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-2">
       {/* Enable Toggle */}
-      <div className="flex items-center justify-between">
-        <span className="text-xs font-medium">Show Watermark</span>
+      <div className="flex items-center justify-between px-3 py-2 border border-border excel-hover">
+        <span className="text-xs font-semibold">Show Watermark</span>
         <Switch
           checked={settings.enabled}
           onCheckedChange={(checked) => onChange({ enabled: checked })}
@@ -43,22 +43,22 @@ export function WatermarkControls({ settings, onChange }: WatermarkControlsProps
       </div>
 
       {settings.enabled && (
-        <>
+        <div className="border border-border bg-card">
           {/* Upload Logo */}
           {!settings.image ? (
             <button
               onClick={() => fileInputRef.current?.click()}
-              className="w-full flex items-center justify-center gap-2 py-3 rounded-lg border-2 border-dashed border-border text-xs hover:border-primary/50 hover:bg-muted/30 transition-colors"
+              className="w-full flex items-center justify-center gap-2 py-3 px-3 border-b border-dashed border-border text-xs font-medium hover:bg-excel-hover transition-colors"
             >
               <Upload className="w-4 h-4" />
               Upload Logo
             </button>
           ) : (
-            <div className="relative rounded-lg overflow-hidden border border-border">
-              <img src={settings.image} alt="Watermark" className="w-full h-12 object-contain bg-muted/30 p-2" />
+            <div className="relative border-b border-border">
+              <img src={settings.image} alt="Watermark" className="w-full h-16 object-contain bg-excel-grid p-2" />
               <button
                 onClick={() => onChange({ image: null })}
-                className="absolute top-1 right-1 p-1 rounded-full bg-destructive text-white"
+                className="absolute top-1 right-1 p-1 bg-destructive text-white hover:bg-destructive/90"
               >
                 <X className="w-3 h-3" />
               </button>
@@ -73,18 +73,18 @@ export function WatermarkControls({ settings, onChange }: WatermarkControlsProps
           />
 
           {/* Position */}
-          <div>
-            <label className="text-[10px] text-muted-foreground mb-1 block">Position</label>
+          <div className="px-3 py-2 border-b border-border">
+            <label className="text-[10px] font-medium text-muted-foreground mb-2 block">Position</label>
             <div className="grid grid-cols-4 gap-1">
               {positions.map((pos) => (
                 <button
                   key={pos.value}
                   onClick={() => onChange({ position: pos.value })}
                   className={cn(
-                    'py-1.5 rounded text-[10px] font-medium transition-all',
+                    'py-1.5 text-[10px] font-medium transition-all border excel-hover',
                     settings.position === pos.value
-                      ? 'bg-primary text-primary-foreground'
-                      : 'bg-muted/50 text-muted-foreground hover:bg-muted'
+                      ? 'bg-excel-selected border-primary border-2'
+                      : 'bg-card border-border'
                   )}
                 >
                   {pos.label}
@@ -93,33 +93,42 @@ export function WatermarkControls({ settings, onChange }: WatermarkControlsProps
             </div>
           </div>
 
-          {/* Size & Opacity */}
-          <div className="grid grid-cols-2 gap-2">
-            <div>
-              <label className="text-[10px] text-muted-foreground">Size: {settings.size}px</label>
-              <Slider
-                value={[settings.size]}
-                onValueChange={([v]) => onChange({ size: v })}
-                min={30}
-                max={200}
-                step={5}
-              />
+          {/* Size */}
+          <div className="px-3 py-2 border-b border-border">
+            <div className="flex items-center justify-between mb-1">
+              <label className="text-[10px] font-medium text-muted-foreground">Size</label>
+              <span className="text-[10px] font-semibold">{settings.size}px</span>
             </div>
-            <div>
-              <label className="text-[10px] text-muted-foreground">Opacity: {settings.opacity}%</label>
-              <Slider
-                value={[settings.opacity]}
-                onValueChange={([v]) => onChange({ opacity: v })}
-                min={10}
-                max={100}
-                step={5}
-              />
+            <Slider
+              value={[settings.size]}
+              onValueChange={([v]) => onChange({ size: v })}
+              min={30}
+              max={200}
+              step={5}
+            />
+          </div>
+
+          {/* Opacity */}
+          <div className="px-3 py-2 border-b border-border">
+            <div className="flex items-center justify-between mb-1">
+              <label className="text-[10px] font-medium text-muted-foreground">Opacity</label>
+              <span className="text-[10px] font-semibold">{settings.opacity}%</span>
             </div>
+            <Slider
+              value={[settings.opacity]}
+              onValueChange={([v]) => onChange({ opacity: v })}
+              min={10}
+              max={100}
+              step={5}
+            />
           </div>
 
           {/* Padding */}
-          <div>
-            <label className="text-[10px] text-muted-foreground">Padding: {settings.padding}px</label>
+          <div className="px-3 py-2">
+            <div className="flex items-center justify-between mb-1">
+              <label className="text-[10px] font-medium text-muted-foreground">Padding</label>
+              <span className="text-[10px] font-semibold">{settings.padding}px</span>
+            </div>
             <Slider
               value={[settings.padding]}
               onValueChange={([v]) => onChange({ padding: v })}
@@ -128,7 +137,7 @@ export function WatermarkControls({ settings, onChange }: WatermarkControlsProps
               step={2}
             />
           </div>
-        </>
+        </div>
       )}
     </div>
   );

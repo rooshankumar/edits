@@ -9,7 +9,7 @@ import { ProjectManager } from '@/components/video-generator/ProjectManager';
 import { ThemeToggle } from '@/components/video-generator/ThemeToggle';
 import { ExportDialog } from '@/components/video-generator/ExportDialog';
 import { TimelineBar } from '@/components/video-generator/TimelineBar';
-import { ExportQuality } from '@/types/video-project';
+import { ExportQuality, ExportFormat } from '@/types/video-project';
 import { computeTimeline } from '@/utils/timeline';
 
 export default function Index() {
@@ -22,8 +22,9 @@ export default function Index() {
   const { exportState, exportVideo, cancelExport } = useVideoExport();
   const previewRef = useRef<HTMLDivElement>(null);
   const [isPlaying, setIsPlaying] = useState(false);
-  const [showExportDialog, setShowExportDialog] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
+  const [showExportDialog, setShowExportDialog] = useState(false);
+  const [showMobileEditor, setShowMobileEditor] = useState(false);
   const animationRef = useRef<number | null>(null);
   const startTimeRef = useRef<number | null>(null);
 
@@ -90,20 +91,18 @@ export default function Index() {
     startTimeRef.current = performance.now() - (time * 1000);
   }, []);
 
-  const handleExport = (quality: ExportQuality) => {
-    if (previewRef.current) exportVideo(project, previewRef.current, quality);
+  const handleExport = (quality: ExportQuality, format: ExportFormat) => {
+    if (previewRef.current) exportVideo(project, previewRef.current, quality, format);
   };
 
   return (
     <div className="h-screen flex flex-col bg-background overflow-hidden">
-      {/* Header */}
-      <header className="h-10 flex items-center justify-between px-2 border-b border-border bg-card/80 backdrop-blur-sm shrink-0">
-        <div className="flex items-center gap-1.5">
-          <div className="w-6 h-6 rounded-lg gradient-primary flex items-center justify-center">
-            <Sparkles className="w-3 h-3 text-white" />
-          </div>
-          <h1 className="text-xs font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
-            ScrollVid
+      {/* Header - Excel Style - Mobile Responsive */}
+      <header className="h-9 md:h-9 flex items-center justify-between px-2 md:px-3 border-b border-border bg-card shrink-0">
+        <div className="flex items-center gap-2">
+          <h1 className="text-xs md:text-sm font-semibold text-foreground">
+            <span className="hidden sm:inline">ScrollVid - Video Editor</span>
+            <span className="sm:hidden">ScrollVid</span>
           </h1>
         </div>
         <ProjectManager 
@@ -119,10 +118,10 @@ export default function Index() {
         <ThemeToggle />
       </header>
 
-      {/* Main Editor Layout */}
+      {/* Main Editor Layout - Excel Style - Mobile Responsive */}
       <div className="flex-1 flex overflow-hidden">
-        {/* Left Sidebar */}
-        <aside className="w-60 max-w-[260px] border-r border-border bg-card shrink-0 overflow-hidden">
+        {/* Left Sidebar - Property Panel - Hidden on mobile, show as bottom sheet */}
+        <aside className="hidden md:block w-64 max-w-[280px] border-r border-border bg-excel-header shrink-0 overflow-hidden">
           <CompactEditor
             project={project}
             timeline={timeline}
@@ -137,10 +136,10 @@ export default function Index() {
           />
         </aside>
 
-        {/* Main Preview Area */}
-        <main className="flex-1 flex flex-col min-w-0 bg-muted/30">
-          {/* Preview */}
-          <div className="flex-1 flex items-center justify-center p-3 min-h-0">
+        {/* Main Preview Area - Mobile Responsive */}
+        <main className="flex-1 flex flex-col min-w-0 bg-card">
+          {/* Preview - Adjust padding for mobile */}
+          <div className="flex-1 flex items-center justify-center p-2 md:p-4 min-h-0 bg-excel-grid">
             <VideoPreview 
               ref={previewRef} 
               project={project} 
@@ -151,9 +150,9 @@ export default function Index() {
             />
           </div>
 
-          {/* Bottom Controls */}
-          <div className="shrink-0 border-t border-border bg-card/80 backdrop-blur-sm p-2 space-y-1.5">
-            {/* Timeline */}
+          {/* Bottom Controls - Mobile Responsive */}
+          <div className="shrink-0 border-t border-border bg-excel-header p-2 md:p-3 space-y-1.5 md:space-y-2">
+            {/* Timeline - Smaller on mobile */}
             <div className="max-w-lg mx-auto w-full">
               <TimelineBar 
                 currentTime={currentTime}
@@ -163,8 +162,15 @@ export default function Index() {
               />
             </div>
             
-            {/* Playback Controls */}
-            <div className="flex justify-center">
+            {/* Playback Controls - Mobile Responsive */}
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-2">
+              {/* Mobile Editor Toggle Button */}
+              <button
+                onClick={() => setShowMobileEditor(!showMobileEditor)}
+                className="md:hidden px-3 py-1.5 text-[10px] font-medium border border-border bg-card hover:bg-excel-hover rounded"
+              >
+                {showMobileEditor ? 'Hide' : 'Show'} Editor
+              </button>
               <PlaybackControls 
                 isPlaying={isPlaying} 
                 onPlayPause={handlePlayPause} 
@@ -177,6 +183,35 @@ export default function Index() {
           </div>
         </main>
       </div>
+
+      {/* Mobile Editor Sheet */}
+      {showMobileEditor && (
+        <div className="md:hidden fixed inset-0 z-50 bg-black/50" onClick={() => setShowMobileEditor(false)}>
+          <div 
+            className="absolute bottom-0 left-0 right-0 bg-excel-header border-t border-border max-h-[70vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="sticky top-0 bg-excel-header border-b border-border px-3 py-2 flex items-center justify-between">
+              <h3 className="text-xs font-semibold">Editor Controls</h3>
+              <button onClick={() => setShowMobileEditor(false)} className="text-xs px-2 py-1 hover:bg-excel-hover">
+                Close
+              </button>
+            </div>
+            <CompactEditor
+              project={project}
+              timeline={timeline}
+              onCanvasFormatChange={setCanvasFormat}
+              onTextChange={updateText}
+              onBackgroundChange={updateBackground}
+              onAnimationChange={updateAnimation}
+              onAudioChange={updateAudio}
+              onWatermarkChange={updateWatermark}
+              onOverlayChange={updateOverlay}
+              onEndingChange={updateEnding}
+            />
+          </div>
+        </div>
+      )}
 
       {/* Export Dialog */}
       <ExportDialog 

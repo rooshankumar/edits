@@ -37,10 +37,10 @@ export function EndingControls({ settings, onChange }: EndingControlsProps) {
   };
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-2">
       {/* Enable Toggle */}
-      <div className="flex items-center justify-between">
-        <span className="text-xs font-medium">Add Ending Card</span>
+      <div className="flex items-center justify-between px-3 py-2 border border-border excel-hover">
+        <span className="text-xs font-semibold">Add Ending Card</span>
         <Switch
           checked={settings.enabled}
           onCheckedChange={(checked) => onChange({ enabled: checked })}
@@ -48,21 +48,37 @@ export function EndingControls({ settings, onChange }: EndingControlsProps) {
       </div>
 
       {settings.enabled && (
-        <>
+        <div className="border border-border bg-card">
           {/* CTA Text */}
-          <div>
-            <label className="text-[10px] text-muted-foreground mb-1 block">Call to Action</label>
+          <div className="px-3 py-2 border-b border-border">
+            <label className="text-[10px] font-medium text-muted-foreground mb-1 block">Call to Action</label>
             <Input
               value={settings.ctaText}
               onChange={(e) => onChange({ ctaText: e.target.value })}
               placeholder="Follow for more!"
-              className="h-8 text-xs"
+              className="h-7 text-xs border-border mb-2"
             />
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-[9px] text-muted-foreground">Text Size</label>
+                <span className="text-[9px] font-semibold">{settings.ctaFontSize}px</span>
+              </div>
+              <Slider
+                value={[settings.ctaFontSize]}
+                onValueChange={([v]) => onChange({ ctaFontSize: v })}
+                min={16}
+                max={80}
+                step={2}
+              />
+            </div>
           </div>
 
           {/* Duration */}
-          <div>
-            <label className="text-[10px] text-muted-foreground">Duration: {settings.duration}s</label>
+          <div className="px-3 py-2 border-b border-border">
+            <div className="flex items-center justify-between mb-1">
+              <label className="text-[10px] font-medium text-muted-foreground">Duration</label>
+              <span className="text-[10px] font-semibold">{settings.duration}s</span>
+            </div>
             <Slider
               value={[settings.duration]}
               onValueChange={([v]) => onChange({ duration: v })}
@@ -73,65 +89,99 @@ export function EndingControls({ settings, onChange }: EndingControlsProps) {
           </div>
 
           {/* Logo Upload */}
-          <div className="flex items-center gap-2">
-            <Switch
-              checked={settings.showLogo}
-              onCheckedChange={(checked) => onChange({ showLogo: checked })}
-            />
-            <span className="text-xs flex-1">Show Logo</span>
-            {settings.showLogo && (
-              settings.logo ? (
-                <div className="relative w-10 h-10 rounded border border-border overflow-hidden">
-                  <img src={settings.logo} alt="Logo" className="w-full h-full object-contain bg-muted/30" />
+          <div className="px-3 py-2 border-b border-border">
+            <div className="flex items-center gap-2 mb-2">
+              <Switch
+                checked={settings.showLogo}
+                onCheckedChange={(checked) => onChange({ showLogo: checked })}
+              />
+              <span className="text-xs font-medium flex-1">Show Logo</span>
+              {settings.showLogo && (
+                settings.logo ? (
+                  <div className="relative w-12 h-12 border border-border overflow-hidden">
+                    <img src={settings.logo} alt="Logo" className="w-full h-full object-contain bg-excel-grid p-1" />
+                    <button
+                      onClick={() => onChange({ logo: null })}
+                      className="absolute -top-1 -right-1 p-0.5 bg-destructive text-white"
+                    >
+                      <X className="w-2.5 h-2.5" />
+                    </button>
+                  </div>
+                ) : (
                   <button
-                    onClick={() => onChange({ logo: null })}
-                    className="absolute -top-1 -right-1 p-0.5 rounded-full bg-destructive text-white"
+                    onClick={() => logoInputRef.current?.click()}
+                    className="p-2 border border-dashed border-border hover:bg-excel-hover"
                   >
-                    <X className="w-2 h-2" />
+                    <Image className="w-4 h-4" />
                   </button>
+                )
+              )}
+            </div>
+            {settings.showLogo && settings.logo && (
+              <div className="mt-2">
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-[9px] text-muted-foreground">Logo Size</label>
+                  <span className="text-[9px] font-semibold">{settings.logoSize}px</span>
                 </div>
-              ) : (
-                <button
-                  onClick={() => logoInputRef.current?.click()}
-                  className="p-2 rounded border border-dashed border-border hover:border-primary/50"
-                >
-                  <Image className="w-4 h-4" />
-                </button>
-              )
+                <Slider
+                  value={[settings.logoSize]}
+                  onValueChange={([v]) => onChange({ logoSize: v })}
+                  min={60}
+                  max={300}
+                  step={10}
+                />
+              </div>
             )}
           </div>
           <input ref={logoInputRef} type="file" accept="image/*" onChange={handleLogoUpload} className="hidden" />
 
           {/* QR Upload */}
-          <div className="flex items-center gap-2">
-            <Switch
-              checked={settings.showQR}
-              onCheckedChange={(checked) => onChange({ showQR: checked })}
-            />
-            <span className="text-xs flex-1">Show QR Code</span>
-            {settings.showQR && (
-              settings.qrCode ? (
-                <div className="relative w-10 h-10 rounded border border-border overflow-hidden">
-                  <img src={settings.qrCode} alt="QR" className="w-full h-full object-contain bg-white" />
+          <div className="px-3 py-2 excel-hover">
+            <div className="flex items-center gap-2">
+              <Switch
+                checked={settings.showQR}
+                onCheckedChange={(checked) => onChange({ showQR: checked })}
+              />
+              <span className="text-xs font-medium flex-1">Show QR Code</span>
+              {settings.showQR && (
+                settings.qrCode ? (
+                  <div className="relative w-12 h-12 border border-border overflow-hidden">
+                    <img src={settings.qrCode} alt="QR" className="w-full h-full object-contain bg-white p-1" />
+                    <button
+                      onClick={() => onChange({ qrCode: null })}
+                      className="absolute -top-1 -right-1 p-0.5 bg-destructive text-white"
+                    >
+                      <X className="w-2.5 h-2.5" />
+                    </button>
+                  </div>
+                ) : (
                   <button
-                    onClick={() => onChange({ qrCode: null })}
-                    className="absolute -top-1 -right-1 p-0.5 rounded-full bg-destructive text-white"
+                    onClick={() => qrInputRef.current?.click()}
+                    className="p-2 border border-dashed border-border hover:bg-excel-hover"
                   >
-                    <X className="w-2 h-2" />
+                    <QrCode className="w-4 h-4" />
                   </button>
+                )
+              )}
+            </div>
+            {settings.showQR && settings.qrCode && (
+              <div className="mt-2">
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-[9px] text-muted-foreground">QR Size</label>
+                  <span className="text-[9px] font-semibold">{settings.qrSize}px</span>
                 </div>
-              ) : (
-                <button
-                  onClick={() => qrInputRef.current?.click()}
-                  className="p-2 rounded border border-dashed border-border hover:border-primary/50"
-                >
-                  <QrCode className="w-4 h-4" />
-                </button>
-              )
+                <Slider
+                  value={[settings.qrSize]}
+                  onValueChange={([v]) => onChange({ qrSize: v })}
+                  min={60}
+                  max={200}
+                  step={10}
+                />
+              </div>
             )}
           </div>
           <input ref={qrInputRef} type="file" accept="image/*" onChange={handleQRUpload} className="hidden" />
-        </>
+        </div>
       )}
     </div>
   );

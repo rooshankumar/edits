@@ -32,7 +32,7 @@ export function AudioControls({ settings, onChange }: AudioControlsProps) {
   };
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-2">
       <input
         ref={audioInputRef}
         type="file"
@@ -45,50 +45,53 @@ export function AudioControls({ settings, onChange }: AudioControlsProps) {
         <button
           onClick={() => audioInputRef.current?.click()}
           className={cn(
-            'w-full flex items-center justify-center gap-2 p-3 rounded-lg',
-            'border-2 border-dashed border-border',
-            'text-muted-foreground hover:border-primary hover:text-primary',
-            'transition-all'
+            'w-full flex items-center justify-center gap-2 py-3 px-3',
+            'border border-dashed border-border bg-card',
+            'text-muted-foreground hover:border-primary hover:bg-excel-hover',
+            'transition-all text-xs font-medium'
           )}
         >
           <Upload className="w-4 h-4" />
-          <span className="text-sm font-medium">Add Background Music</span>
+          <span>Add Background Music</span>
         </button>
       ) : (
-        <div className="space-y-3 p-3 rounded-lg bg-muted/50 border border-border">
+        <div className="space-y-2 border border-border bg-card">
           {/* File info */}
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
-              <Music className="w-4 h-4 text-primary" />
-            </div>
-            <span className="flex-1 text-sm font-medium truncate">
+          <div className="flex items-center gap-2 px-3 py-2 border-b border-border excel-hover">
+            <Music className="w-4 h-4 text-primary" />
+            <span className="flex-1 text-xs font-medium truncate">
               {settings.fileName}
             </span>
             <button
               onClick={handleRemove}
-              className="p-1 rounded-md hover:bg-destructive/10 text-destructive"
+              className="p-1 hover:bg-destructive/10 text-destructive transition-colors"
             >
-              <X className="w-4 h-4" />
+              <X className="w-3.5 h-3.5" />
             </button>
           </div>
 
           {/* Volume */}
-          <div className="flex items-center gap-2">
-            <Volume2 className="w-4 h-4 text-muted-foreground" />
-            <Slider
-              value={[settings.volume]}
-              onValueChange={([v]) => onChange({ volume: v })}
-              min={0}
-              max={100}
-              step={1}
-              className="flex-1"
-            />
-            <span className="text-xs font-mono w-8 text-right">{settings.volume}%</span>
+          <div className="px-3 py-2">
+            <div className="flex items-center justify-between mb-1">
+              <label className="text-[10px] font-medium text-muted-foreground">Volume</label>
+              <span className="text-[10px] font-semibold">{settings.volume}%</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Volume2 className="w-3.5 h-3.5 text-muted-foreground" />
+              <Slider
+                value={[settings.volume]}
+                onValueChange={([v]) => onChange({ volume: v })}
+                min={0}
+                max={100}
+                step={1}
+                className="flex-1"
+              />
+            </div>
           </div>
 
           {/* Loop */}
-          <div className="flex items-center justify-between">
-            <span className="text-xs text-muted-foreground">Loop audio</span>
+          <div className="flex items-center justify-between px-3 py-2 border-t border-border excel-hover">
+            <span className="text-xs font-medium">Loop audio</span>
             <Switch
               checked={settings.loop}
               onCheckedChange={(checked) => onChange({ loop: checked })}

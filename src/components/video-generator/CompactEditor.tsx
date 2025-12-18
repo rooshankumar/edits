@@ -3,7 +3,7 @@ import {
   Type, Palette, Sparkles, Music, ChevronDown, ChevronUp, 
   Bold, Italic, AlignLeft, AlignCenter, AlignRight,
   ArrowUp, ArrowLeft, ArrowRight, RotateCcw, X, Image as ImageIcon, Film,
-  Stamp, Layers, Flag, AlertTriangle
+  Stamp, Layers, Flag, AlertTriangle, Maximize2
 } from 'lucide-react';
 import { 
   VideoProject, TextSettings, BackgroundSettings, AnimationSettings, AudioSettings,
@@ -11,6 +11,7 @@ import {
   FONT_FAMILIES, CANVAS_SIZES, CanvasFormat, WPMPreset, WPM_PRESETS
 } from '@/types/video-project';
 import { TimelineState, getWPMLevel } from '@/utils/timeline';
+import { getContentLengthCategory } from '@/utils/textScaling';
 import { Textarea } from '@/components/ui/textarea';
 import { Slider } from '@/components/ui/slider';
 import { Switch } from '@/components/ui/switch';
@@ -52,21 +53,20 @@ function Section({ title, icon, defaultOpen = true, children, accentColor, badge
       <button
         onClick={() => setIsOpen(!isOpen)}
         className={cn(
-          'w-full flex items-center justify-between p-2 hover:bg-muted/50 transition-colors',
-          isOpen && 'bg-muted/30'
+          'w-full flex items-center justify-between px-3 py-2 excel-hover bg-card border-b border-border',
+          isOpen && 'bg-excel-selected'
         )}
       >
-        <div className="flex items-center gap-1.5">
-          <div className={cn('text-muted-foreground', accentColor)}>{icon}</div>
-          <span className="text-xs font-semibold">{title}</span>
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-semibold text-foreground">{title}</span>
           {badge && (
-            <span className="px-1.5 py-0.5 text-[9px] font-medium rounded bg-primary/10 text-primary">{badge}</span>
+            <span className="px-1.5 py-0.5 text-[9px] font-medium bg-primary/10 text-primary">{badge}</span>
           )}
         </div>
-        {isOpen ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+        {isOpen ? <ChevronUp className="w-3 h-3 text-muted-foreground" /> : <ChevronDown className="w-3 h-3 text-muted-foreground" />}
       </button>
       {isOpen && (
-        <div className="p-2 pt-0 space-y-2">
+        <div className="p-3 space-y-3 bg-card">
           {children}
         </div>
       )}
@@ -125,127 +125,161 @@ export function CompactEditor({
   return (
     <ScrollArea className="h-full">
       <div className="divide-y divide-border">
-        {/* Canvas Format - Ultra Compact */}
-        <div className="p-2">
-          <div className="grid grid-cols-4 gap-1">
+        {/* Canvas Format */}
+        <div className="p-3 bg-card border-b border-border">
+          <label className="text-xs font-semibold text-foreground mb-2 block">Canvas Format</label>
+          <div className="grid grid-cols-4 gap-1.5">
             {canvasOptions.map((opt) => (
               <button
                 key={opt.value}
                 onClick={() => onCanvasFormatChange(opt.value)}
                 className={cn(
-                  'px-1.5 py-1 rounded text-[10px] font-medium transition-all',
+                  'px-2 py-1.5 text-[10px] font-medium transition-all border excel-hover',
                   project.canvasFormat === opt.value
-                    ? 'bg-primary text-primary-foreground'
-                    : 'bg-muted/50 text-muted-foreground hover:bg-muted'
+                    ? 'bg-excel-selected border-primary border-2'
+                    : 'bg-card border-border'
                 )}
               >
                 {opt.label}
               </button>
             ))}
           </div>
-          <p className="text-[9px] text-muted-foreground mt-1 text-center">
+          <p className="text-[10px] text-muted-foreground mt-2 text-center">
             {CANVAS_SIZES[project.canvasFormat].width}×{CANVAS_SIZES[project.canvasFormat].height}
           </p>
         </div>
 
         {/* TEXT Section */}
-        <Section title="Text" icon={<Type className="w-3 h-3" />} accentColor="text-blue-500">
-          <Textarea
-            value={project.text.content}
-            onChange={(e) => onTextChange({ content: e.target.value })}
-            placeholder="Enter your scrolling text..."
-            className="min-h-[80px] resize-none bg-muted/50 text-xs"
-          />
-          <p className="text-[9px] text-muted-foreground text-right">
-            {timeline.wordCount} words
-          </p>
+        <Section title="Text" icon={<Type className="w-3 h-3" />}>
+          <div>
+            <label className="text-[10px] font-medium text-muted-foreground mb-1 block">Content</label>
+            <Textarea
+              value={project.text.content}
+              onChange={(e) => onTextChange({ content: e.target.value })}
+              placeholder="Enter your scrolling text..."
+              className="min-h-[80px] resize-none border-border text-xs"
+            />
+            <div className="flex items-center justify-between mt-1">
+              <div className="flex items-center gap-1">
+                {(() => {
+                  const lengthInfo = getContentLengthCategory(timeline.wordCount);
+                  return (
+                    <>
+                      <span className={cn(
+                        'text-[9px] px-1.5 py-0.5 rounded font-medium',
+                        lengthInfo.category === 'short' && 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300',
+                        lengthInfo.category === 'medium' && 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300',
+                        lengthInfo.category === 'long' && 'bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-300',
+                        lengthInfo.category === 'very-long' && 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300'
+                      )}>
+                        {lengthInfo.label}
+                      </span>
+                      <span className="text-[9px] text-muted-foreground">{lengthInfo.description}</span>
+                    </>
+                  );
+                })()}
+              </div>
+              <p className="text-[10px] text-muted-foreground">
+                {timeline.wordCount} words
+              </p>
+            </div>
+          </div>
 
           {/* Font + Size */}
-          <div className="grid grid-cols-2 gap-1.5">
-            <Select value={project.text.fontFamily} onValueChange={(v) => onTextChange({ fontFamily: v })}>
-              <SelectTrigger className="h-7 text-[10px]">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {FONT_FAMILIES.map((font) => (
-                  <SelectItem key={font.value} value={font.value} className="text-xs">
-                    <span style={{ fontFamily: font.value }}>{font.name}</span>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <div className="flex items-center gap-1">
-              <span className="text-[9px] text-muted-foreground w-6">{project.text.fontSize}</span>
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className="text-[10px] font-medium text-muted-foreground mb-1 block">Font</label>
+              <Select value={project.text.fontFamily} onValueChange={(v) => onTextChange({ fontFamily: v })}>
+                <SelectTrigger className="h-7 text-[10px] border-border">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="border-border">
+                  {FONT_FAMILIES.map((font) => (
+                    <SelectItem key={font.value} value={font.value} className="text-xs">
+                      <span style={{ fontFamily: font.value }}>{font.name}</span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <label className="text-[10px] font-medium text-muted-foreground mb-1 block">Size: {project.text.fontSize}px</label>
               <Slider
                 value={[project.text.fontSize]}
                 onValueChange={([v]) => onTextChange({ fontSize: v })}
                 min={16}
                 max={120}
                 step={2}
-                className="flex-1"
+                className="mt-2"
               />
             </div>
           </div>
 
           {/* Style buttons */}
-          <div className="flex gap-1">
-            <button
-              onClick={() => onTextChange({ isBold: !project.text.isBold })}
-              className={cn(
-                'flex-1 flex items-center justify-center py-1 rounded border transition-all',
-                project.text.isBold ? 'border-primary bg-primary/10' : 'border-border'
-              )}
-            >
-              <Bold className="w-3 h-3" />
-            </button>
-            <button
-              onClick={() => onTextChange({ isItalic: !project.text.isItalic })}
-              className={cn(
-                'flex-1 flex items-center justify-center py-1 rounded border transition-all',
-                project.text.isItalic ? 'border-primary bg-primary/10' : 'border-border'
-              )}
-            >
-              <Italic className="w-3 h-3" />
-            </button>
-            <div className="w-px bg-border" />
-            {[
-              { value: 'left' as const, icon: AlignLeft },
-              { value: 'center' as const, icon: AlignCenter },
-              { value: 'right' as const, icon: AlignRight },
-            ].map(({ value, icon: Icon }) => (
+          <div>
+            <label className="text-[10px] font-medium text-muted-foreground mb-1 block">Style & Alignment</label>
+            <div className="flex gap-1">
               <button
-                key={value}
-                onClick={() => onTextChange({ textAlign: value })}
+                onClick={() => onTextChange({ isBold: !project.text.isBold })}
                 className={cn(
-                  'flex-1 flex items-center justify-center py-1 rounded border transition-all',
-                  project.text.textAlign === value ? 'border-primary bg-primary/10' : 'border-border'
+                  'flex-1 flex items-center justify-center py-1.5 border transition-all excel-hover',
+                  project.text.isBold ? 'border-primary bg-excel-selected border-2' : 'border-border'
                 )}
               >
-                <Icon className="w-3 h-3" />
+                <Bold className="w-3 h-3" />
               </button>
-            ))}
+              <button
+                onClick={() => onTextChange({ isItalic: !project.text.isItalic })}
+                className={cn(
+                  'flex-1 flex items-center justify-center py-1.5 border transition-all excel-hover',
+                  project.text.isItalic ? 'border-primary bg-excel-selected border-2' : 'border-border'
+                )}
+              >
+                <Italic className="w-3 h-3" />
+              </button>
+              <div className="w-px bg-border" />
+              {[
+                { value: 'left' as const, icon: AlignLeft },
+                { value: 'center' as const, icon: AlignCenter },
+                { value: 'right' as const, icon: AlignRight },
+              ].map(({ value, icon: Icon }) => (
+                <button
+                  key={value}
+                  onClick={() => onTextChange({ textAlign: value })}
+                  className={cn(
+                    'flex-1 flex items-center justify-center py-1.5 border transition-all excel-hover',
+                    project.text.textAlign === value ? 'border-primary bg-excel-selected border-2' : 'border-border'
+                  )}
+                >
+                  <Icon className="w-3 h-3" />
+                </button>
+              ))}
+            </div>
           </div>
 
           {/* Color */}
-          <div className="flex items-center gap-1.5">
-            <input
-              type="color"
-              value={project.text.color}
-              onChange={(e) => onTextChange({ color: e.target.value })}
-              className="w-6 h-6 rounded border border-border cursor-pointer"
-            />
-            <div className="flex gap-1 flex-1">
-              {['#ffffff', '#000000', '#ff6b6b', '#4ecdc4', '#ffe66d'].map((color) => (
-                <button
-                  key={color}
-                  onClick={() => onTextChange({ color })}
-                  className={cn(
-                    'w-5 h-5 rounded border transition-all hover:scale-110',
-                    project.text.color === color ? 'border-primary border-2' : 'border-border'
-                  )}
-                  style={{ backgroundColor: color }}
-                />
-              ))}
+          <div>
+            <label className="text-[10px] font-medium text-muted-foreground mb-1 block">Color</label>
+            <div className="flex items-center gap-2">
+              <input
+                type="color"
+                value={project.text.color}
+                onChange={(e) => onTextChange({ color: e.target.value })}
+                className="w-7 h-7 border border-border cursor-pointer"
+              />
+              <div className="flex gap-1 flex-1">
+                {['#ffffff', '#000000', '#ff6b6b', '#4ecdc4', '#ffe66d'].map((color) => (
+                  <button
+                    key={color}
+                    onClick={() => onTextChange({ color })}
+                    className={cn(
+                      'w-6 h-6 border transition-all excel-hover',
+                      project.text.color === color ? 'border-primary border-2' : 'border-border'
+                    )}
+                    style={{ backgroundColor: color }}
+                  />
+                ))}
+              </div>
             </div>
           </div>
 
@@ -276,10 +310,40 @@ export function CompactEditor({
               <Slider value={[project.text.containerWidth]} onValueChange={([v]) => onTextChange({ containerWidth: v })} min={50} max={100} step={5} />
             </div>
           </div>
+
+          {/* Auto-Scale Font */}
+          <div className="flex items-center justify-between px-3 py-2 border border-border excel-hover">
+            <div className="flex items-center gap-2">
+              <Maximize2 className="w-3.5 h-3.5 text-primary" />
+              <div>
+                <p className="text-[10px] font-medium">Auto-Scale Font</p>
+                <p className="text-[9px] text-muted-foreground">Optimize for long stories</p>
+              </div>
+            </div>
+            <Switch
+              checked={project.text.autoScaleFont}
+              onCheckedChange={(checked) => onTextChange({ autoScaleFont: checked })}
+            />
+          </div>
+
+          {/* Wave Animation */}
+          <div className="flex items-center justify-between px-3 py-2 border border-border excel-hover">
+            <div className="flex items-center gap-2">
+              <Sparkles className="w-3.5 h-3.5 text-primary" />
+              <div>
+                <p className="text-[10px] font-medium">Wave Animation</p>
+                <p className="text-[9px] text-muted-foreground">Characters animate one by one</p>
+              </div>
+            </div>
+            <Switch
+              checked={project.text.waveAnimation}
+              onCheckedChange={(checked) => onTextChange({ waveAnimation: checked })}
+            />
+          </div>
         </Section>
 
         {/* ANIMATION Section - WPM Based */}
-        <Section title="Animation" icon={<Sparkles className="w-3 h-3" />} accentColor="text-purple-500">
+        <Section title="Animation" icon={<Sparkles className="w-3 h-3" />}>
           {/* Direction */}
           <div className="grid grid-cols-3 gap-1">
             {[
@@ -414,7 +478,7 @@ export function CompactEditor({
         </Section>
 
         {/* BACKGROUND Section */}
-        <Section title="Background" icon={<Palette className="w-3 h-3" />} defaultOpen={false} accentColor="text-green-500">
+        <Section title="Background" icon={<Palette className="w-3 h-3" />} defaultOpen={false}>
           <div className="flex items-center gap-1.5">
             <input
               type="color"
@@ -478,22 +542,22 @@ export function CompactEditor({
         </Section>
 
         {/* AUDIO Section */}
-        <Section title="Audio" icon={<Music className="w-3 h-3" />} defaultOpen={true} accentColor="text-orange-500" badge={project.audio.file ? '♪' : undefined}>
+        <Section title="Audio" icon={<Music className="w-3 h-3" />} defaultOpen={true} badge={project.audio.file ? '♪' : undefined}>
           <AudioControls settings={project.audio} onChange={onAudioChange} />
         </Section>
 
         {/* WATERMARK Section */}
-        <Section title="Watermark" icon={<Stamp className="w-3 h-3" />} defaultOpen={false} accentColor="text-pink-500" badge={project.watermark.enabled ? 'ON' : undefined}>
+        <Section title="Watermark" icon={<Stamp className="w-3 h-3" />} defaultOpen={false} badge={project.watermark.enabled ? 'ON' : undefined}>
           <WatermarkControls settings={project.watermark} onChange={onWatermarkChange} />
         </Section>
 
         {/* OVERLAY Section */}
-        <Section title="Overlay" icon={<Layers className="w-3 h-3" />} defaultOpen={false} accentColor="text-cyan-500" badge={project.overlay.enabled ? 'ON' : undefined}>
+        <Section title="Overlay" icon={<Layers className="w-3 h-3" />} defaultOpen={false} badge={project.overlay.enabled ? 'ON' : undefined}>
           <OverlayControls settings={project.overlay} onChange={onOverlayChange} />
         </Section>
 
         {/* ENDING Section */}
-        <Section title="Ending" icon={<Flag className="w-3 h-3" />} defaultOpen={false} accentColor="text-yellow-500" badge={project.ending.enabled ? 'ON' : undefined}>
+        <Section title="Ending" icon={<Flag className="w-3 h-3" />} defaultOpen={false} badge={project.ending.enabled ? 'ON' : undefined}>
           <EndingControls settings={project.ending} onChange={onEndingChange} />
         </Section>
       </div>

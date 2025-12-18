@@ -11,10 +11,10 @@ interface OverlayControlsProps {
 
 export function OverlayControls({ settings, onChange }: OverlayControlsProps) {
   return (
-    <div className="space-y-3">
+    <div className="space-y-2">
       {/* Enable Toggle */}
-      <div className="flex items-center justify-between">
-        <span className="text-xs font-medium">Show Overlay Text</span>
+      <div className="flex items-center justify-between px-3 py-2 border border-border excel-hover">
+        <span className="text-xs font-semibold">Show Overlay Text</span>
         <Switch
           checked={settings.enabled}
           onCheckedChange={(checked) => onChange({ enabled: checked })}
@@ -22,36 +22,45 @@ export function OverlayControls({ settings, onChange }: OverlayControlsProps) {
       </div>
 
       {settings.enabled && (
-        <>
+        <div className="border border-border bg-card">
           {/* Text Input */}
-          <Input
-            value={settings.content}
-            onChange={(e) => onChange({ content: e.target.value })}
-            placeholder="Enter overlay text..."
-            className="h-8 text-xs"
-          />
+          <div className="px-3 py-2 border-b border-border">
+            <label className="text-[10px] font-medium text-muted-foreground mb-1 block">Text Content</label>
+            <Input
+              value={settings.content}
+              onChange={(e) => onChange({ content: e.target.value })}
+              placeholder="Enter overlay text..."
+              className="h-7 text-xs border-border"
+            />
+          </div>
 
           {/* Position */}
-          <div className="grid grid-cols-2 gap-1">
-            {(['top', 'bottom'] as OverlayPosition[]).map((pos) => (
-              <button
-                key={pos}
-                onClick={() => onChange({ position: pos })}
-                className={cn(
-                  'py-1.5 rounded text-xs font-medium transition-all capitalize',
-                  settings.position === pos
-                    ? 'bg-primary text-primary-foreground'
-                    : 'bg-muted/50 text-muted-foreground hover:bg-muted'
-                )}
-              >
-                {pos}
-              </button>
-            ))}
+          <div className="px-3 py-2 border-b border-border">
+            <label className="text-[10px] font-medium text-muted-foreground mb-2 block">Position</label>
+            <div className="grid grid-cols-2 gap-1.5">
+              {(['top', 'bottom'] as OverlayPosition[]).map((pos) => (
+                <button
+                  key={pos}
+                  onClick={() => onChange({ position: pos })}
+                  className={cn(
+                    'py-1.5 text-xs font-medium transition-all capitalize border excel-hover',
+                    settings.position === pos
+                      ? 'bg-excel-selected border-primary border-2'
+                      : 'bg-card border-border'
+                  )}
+                >
+                  {pos}
+                </button>
+              ))}
+            </div>
           </div>
 
           {/* Font Size */}
-          <div>
-            <label className="text-[10px] text-muted-foreground">Size: {settings.fontSize}px</label>
+          <div className="px-3 py-2 border-b border-border">
+            <div className="flex items-center justify-between mb-1">
+              <label className="text-[10px] font-medium text-muted-foreground">Font Size</label>
+              <span className="text-[10px] font-semibold">{settings.fontSize}px</span>
+            </div>
             <Slider
               value={[settings.fontSize]}
               onValueChange={([v]) => onChange({ fontSize: v })}
@@ -62,27 +71,30 @@ export function OverlayControls({ settings, onChange }: OverlayControlsProps) {
           </div>
 
           {/* Colors */}
-          <div className="flex gap-2">
-            <div className="flex-1">
-              <label className="text-[10px] text-muted-foreground block mb-1">Text</label>
-              <input
-                type="color"
-                value={settings.color}
-                onChange={(e) => onChange({ color: e.target.value })}
-                className="w-full h-7 rounded border border-border cursor-pointer"
-              />
-            </div>
-            <div className="flex-1">
-              <label className="text-[10px] text-muted-foreground block mb-1">Background</label>
-              <input
-                type="color"
-                value={settings.backgroundColor.startsWith('rgba') ? '#000000' : settings.backgroundColor}
-                onChange={(e) => onChange({ backgroundColor: e.target.value + '99' })}
-                className="w-full h-7 rounded border border-border cursor-pointer"
-              />
+          <div className="px-3 py-2">
+            <label className="text-[10px] font-medium text-muted-foreground mb-2 block">Colors</label>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="text-[10px] text-muted-foreground block mb-1">Text</label>
+                <input
+                  type="color"
+                  value={settings.color}
+                  onChange={(e) => onChange({ color: e.target.value })}
+                  className="w-full h-7 border border-border cursor-pointer"
+                />
+              </div>
+              <div>
+                <label className="text-[10px] text-muted-foreground block mb-1">Background</label>
+                <input
+                  type="color"
+                  value={settings.backgroundColor.startsWith('rgba') ? '#000000' : settings.backgroundColor}
+                  onChange={(e) => onChange({ backgroundColor: e.target.value + '99' })}
+                  className="w-full h-7 border border-border cursor-pointer"
+                />
+              </div>
             </div>
           </div>
-        </>
+        </div>
       )}
     </div>
   );

@@ -67,11 +67,16 @@ export function computeScrollState(
   contentDuration: number,
   endingEnabled: boolean
 ): ScrollState {
+  // If ending is enabled, transition smoothly in last 0.5s of content
+  const transitionDuration = 0.5;
+  const transitionStart = endingEnabled ? contentDuration - transitionDuration : contentDuration;
   const isEnding = endingEnabled && currentTime >= contentDuration;
   
   // Progress through content (0 = start, 1 = end)
+  // IMPORTANT: Stop scrolling before content ends so last text stays visible
+  const scrollEndTime = endingEnabled ? transitionStart : contentDuration;
   const progress = contentDuration > 0 
-    ? Math.min(currentTime / contentDuration, 1)
+    ? Math.min(currentTime / scrollEndTime, 1)
     : 0;
   
   // Scroll offset: starts at 100% (off bottom), ends at -100% (off top)
@@ -100,6 +105,76 @@ export function getWPMLevel(wpm: number): 'good' | 'warning' | 'danger' {
   if (wpm <= 180) return 'good';      // Beginner-friendly
   if (wpm <= 300) return 'warning';   // Average to comfortable
   return 'danger';                     // Too fast for most readers
+}
+
+/**
+ * Unified scroll position calculation
+ * Used by BOTH preview and export to ensure identical animations
+ */
+export function calculateScrollPosition(
+  progress: number,
+  viewportHeight: number,
+  contentHeight: number
+): number {
+  // Calculate scroll so text starts below viewport and scrolls up
+  // When progress = 0: text is below viewport (startPosition)
+  // When progress = 1: last text frozen with bottom margin for Instagram UI
+  
+  // Reserve bottom space for Instagram reel UI (like/comment/share buttons)
+  // ~75px = 2cm at typical phone DPI (160dpi: 2cm = 75.6px)
+  const instagramUIMargin = 75;
+  const effectiveViewportHeight = viewportHeight - instagramUIMargin;
+  
+  const totalScrollDistance = viewportHeight + contentHeight;
+  const startPosition = viewportHeight;
+  
+  // Stop when last text is visible with bottom margin for Instagram UI
+  // This ensures text doesn't overlap with Instagram's interaction buttons
+  const maxScroll = contentHeight > effectiveViewportHeight 
+    ? totalScrollDistance - effectiveViewportHeight 
+    : totalScrollDistance;
+  
+  const scrollPosition = startPosition - (progress * maxScroll);
+  
+  // Clamp to ensure last text stays visible with Instagram UI margin
+  return Math.max(scrollPosition, -contentHeight + effectiveViewportHeight);
+}
+
+/**
+ * Calculate opacity for smooth transition between content and ending
+ */
+export function calculateTransitionOpacity(currentTime: number, contentDuration: number, endingEnabled: boolean): { contentOpacity: number; endingOpacity: number } {
+  if (!endingEnabled) {
+    return { contentOpacity: 1, endingOpacity: 0 };
+  }
+  
+  const transitionDuration = 0.5;
+  const transitionStart = contentDuration - transitionDuration;
+  
+  if (currentTime < transitionStart) {
+    return { contentOpacity: 1, endingOpacity: 0 };
+  } else if (currentTime >= contentDuration) {
+    return { contentOpacity: 0, endingOpacity: 1 };
+  } else {
+    // Smooth fade transition
+    const transitionProgress = (currentTime - transitionStart) / transitionDuration;
+    return { 
+      contentOpacity: 1 - transitionProgress, 
+      endingOpacity: transitionProgress 
+    };
+  }
+}
+
+/**
+ * Calculate relative font size based on canvas height
+ * Ensures text scales proportionally across all resolutions
+ */
+export function calculateRelativeFontSize(
+  baseFontSize: number,
+  canvasHeight: number,
+  baseHeight: number = 1920
+): number {
+  return Math.round((baseFontSize / baseHeight) * canvasHeight);
 }
 
 /**

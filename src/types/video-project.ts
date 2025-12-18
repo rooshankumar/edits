@@ -2,7 +2,7 @@ export type CanvasFormat = 'vertical' | 'horizontal' | 'square' | 'tiktok' | 'yo
 export type ScrollDirection = 'up' | 'left' | 'right';
 export type TextAlign = 'left' | 'center' | 'right';
 export type ExportQuality = 'standard' | 'hd' | 'ultra';
-export type ExportFormat = 'webm' | 'gif';
+export type ExportFormat = 'mp4' | 'webm' | 'gif';
 export type WatermarkPosition = 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
 export type OverlayPosition = 'top' | 'bottom';
 export type WPMPreset = 'beginner' | 'average' | 'comfortable' | 'fast' | 'custom';
@@ -11,6 +11,7 @@ export interface TextSettings {
   content: string;
   fontFamily: string;
   fontSize: number;
+  autoScaleFont: boolean;
   isBold: boolean;
   isItalic: boolean;
   lineHeight: number;
@@ -20,6 +21,7 @@ export interface TextSettings {
   paddingX: number;
   paddingY: number;
   containerWidth: number;
+  waveAnimation: boolean;
 }
 
 export interface BackgroundSettings {
@@ -67,8 +69,11 @@ export interface EndingSettings {
   enabled: boolean;
   duration: number;
   ctaText: string;
+  ctaFontSize: number;
   logo: string | null;
+  logoSize: number;
   qrCode: string | null;
+  qrSize: number;
   showLogo: boolean;
   showQR: boolean;
 }
@@ -126,6 +131,7 @@ export const DEFAULT_PROJECT: Omit<VideoProject, 'id' | 'createdAt' | 'updatedAt
   text: {
     content: 'Enter your scrolling text here...\n\nAdd multiple lines for a longer scroll effect.\n\nPerfect for social media reels and videos!',
     fontSize: 48,
+    autoScaleFont: true,
     fontFamily: 'Poppins, sans-serif',
     isBold: false,
     isItalic: false,
@@ -136,6 +142,7 @@ export const DEFAULT_PROJECT: Omit<VideoProject, 'id' | 'createdAt' | 'updatedAt
     paddingX: 40,
     paddingY: 40,
     containerWidth: 90,
+    waveAnimation: false,
   },
   background: {
     color: '#1a1a2e',
@@ -177,8 +184,11 @@ export const DEFAULT_PROJECT: Omit<VideoProject, 'id' | 'createdAt' | 'updatedAt
     enabled: false,
     duration: 3,
     ctaText: 'Follow for more!',
+    ctaFontSize: 32,
     logo: null,
+    logoSize: 120,
     qrCode: null,
+    qrSize: 100,
     showLogo: false,
     showQR: false,
   },

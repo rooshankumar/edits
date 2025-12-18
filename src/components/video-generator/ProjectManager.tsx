@@ -58,7 +58,7 @@ export function ProjectManager({
           onChange={(e) => setTempName(e.target.value)}
           onBlur={handleSaveName}
           onKeyDown={(e) => e.key === 'Enter' && handleSaveName()}
-          className="h-8 w-48 text-sm font-medium"
+          className="h-7 w-48 text-xs border-border"
           autoFocus
         />
       ) : (
@@ -67,7 +67,7 @@ export function ProjectManager({
             setTempName(project.name);
             setEditingName(true);
           }}
-          className="px-3 py-1 text-sm font-semibold text-foreground hover:bg-muted rounded-lg transition-colors"
+          className="px-2 py-1 text-xs font-semibold text-foreground excel-hover"
         >
           {project.name}
         </button>
@@ -75,25 +75,25 @@ export function ProjectManager({
 
       {/* Save Button */}
       <Button
-        variant="ghost"
+        variant="outline"
         size="sm"
         onClick={onSave}
-        className="gap-1"
+        className="h-7 px-2 gap-1.5 border-border excel-hover"
       >
-        <Save className="w-4 h-4" />
-        <span className="hidden sm:inline">Save</span>
+        <Save className="w-3.5 h-3.5" />
+        <span className="hidden sm:inline text-xs">Save</span>
       </Button>
 
       {/* Projects Dropdown */}
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button variant="outline" size="sm" className="gap-1">
-            <FolderOpen className="w-4 h-4" />
-            <span className="hidden sm:inline">Projects</span>
+          <Button variant="outline" size="sm" className="h-7 px-2 gap-1.5 border-border excel-hover">
+            <FolderOpen className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline text-xs">File</span>
             <ChevronDown className="w-3 h-3" />
           </Button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-56">
+        <DropdownMenuContent align="end" className="w-56 border-border shadow-dialog">
           <DropdownMenuItem onClick={onNew} className="gap-2">
             <Plus className="w-4 h-4" />
             New Project

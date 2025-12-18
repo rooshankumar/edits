@@ -6,57 +6,68 @@
 
 @layer base {
   :root {
-    --background: 250 30% 98%;
-    --foreground: 250 30% 10%;
-    --card: 250 30% 100%;
-    --card-foreground: 250 30% 10%;
-    --popover: 250 30% 100%;
-    --popover-foreground: 250 30% 10%;
-    --primary: 280 85% 65%;
+    /* Excel Light Theme - Professional Gray/Blue */
+    --background: 0 0% 100%;
+    --foreground: 0 0% 13%;
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 13%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 13%;
+    --primary: 210 100% 45%;
     --primary-foreground: 0 0% 100%;
-    --secondary: 200 85% 60%;
-    --secondary-foreground: 0 0% 100%;
-    --muted: 250 20% 92%;
-    --muted-foreground: 250 15% 45%;
-    --accent: 330 85% 60%;
+    --secondary: 210 15% 95%;
+    --secondary-foreground: 0 0% 13%;
+    --muted: 210 15% 97%;
+    --muted-foreground: 0 0% 45%;
+    --accent: 210 100% 45%;
     --accent-foreground: 0 0% 100%;
-    --destructive: 0 85% 60%;
+    --destructive: 0 70% 50%;
     --destructive-foreground: 0 0% 100%;
-    --border: 250 20% 88%;
-    --input: 250 20% 88%;
-    --ring: 280 85% 65%;
-    --radius: 1rem;
-    --gradient-primary: linear-gradient(135deg, hsl(280 85% 65%), hsl(330 85% 60%));
-    --gradient-secondary: linear-gradient(135deg, hsl(200 85% 60%), hsl(280 85% 65%));
-    --shadow-glow: 0 0 30px hsl(280 85% 65% / 0.3);
-    --shadow-soft: 0 4px 20px hsl(250 30% 10% / 0.08);
-    --shadow-medium: 0 8px 30px hsl(250 30% 10% / 0.12);
-    --success: 150 80% 45%;
-    --warning: 40 90% 55%;
+    --border: 0 0% 85%;
+    --input: 0 0% 100%;
+    --ring: 210 100% 45%;
+    --radius: 0rem;
+    --excel-grid: 0 0% 90%;
+    --excel-header: 210 15% 97%;
+    --excel-hover: 210 100% 96%;
+    --excel-selected: 210 100% 93%;
+    --excel-border: 0 0% 82%;
+    --shadow-dialog: 0 0% 0% / 0.15;
+    --shadow-soft: 0 2px 4px hsl(0 0% 0% / 0.1);
+    --shadow-medium: 0 4px 12px hsl(0 0% 0% / 0.15);
+    --success: 120 60% 45%;
+    --warning: 40 100% 50%;
   }
 
   .dark {
-    --background: 250 30% 8%;
-    --foreground: 250 20% 95%;
-    --card: 250 30% 12%;
-    --card-foreground: 250 20% 95%;
-    --popover: 250 30% 12%;
-    --popover-foreground: 250 20% 95%;
-    --primary: 280 85% 65%;
+    /* Excel Dark Theme - Professional Dark Gray */
+    --background: 0 0% 12%;
+    --foreground: 0 0% 95%;
+    --card: 0 0% 16%;
+    --card-foreground: 0 0% 95%;
+    --popover: 0 0% 16%;
+    --popover-foreground: 0 0% 95%;
+    --primary: 210 100% 55%;
     --primary-foreground: 0 0% 100%;
-    --secondary: 200 85% 55%;
-    --secondary-foreground: 0 0% 100%;
-    --muted: 250 20% 18%;
-    --muted-foreground: 250 15% 60%;
-    --accent: 330 85% 60%;
+    --secondary: 210 10% 25%;
+    --secondary-foreground: 0 0% 95%;
+    --muted: 0 0% 20%;
+    --muted-foreground: 0 0% 65%;
+    --accent: 210 100% 55%;
     --accent-foreground: 0 0% 100%;
-    --destructive: 0 75% 55%;
+    --destructive: 0 70% 55%;
     --destructive-foreground: 0 0% 100%;
-    --border: 250 20% 20%;
-    --input: 250 20% 20%;
-    --ring: 280 85% 65%;
-    --shadow-soft: 0 4px 20px hsl(0 0% 0% / 0.3);
-    --shadow-medium: 0 8px 30px hsl(0 0% 0% / 0.4);
+    --border: 0 0% 28%;
+    --input: 0 0% 20%;
+    --ring: 210 100% 55%;
+    --excel-grid: 0 0% 24%;
+    --excel-header: 0 0% 18%;
+    --excel-hover: 210 100% 20%;
+    --excel-selected: 210 100% 25%;
+    --excel-border: 0 0% 32%;
+    --shadow-dialog: 0 0% 0% / 0.5;
+    --shadow-soft: 0 2px 4px hsl(0 0% 0% / 0.3);
+    --shadow-medium: 0 4px 12px hsl(0 0% 0% / 0.5);
   }
 }
 
@@ -66,11 +77,14 @@
 }
 
 @layer utilities {
-  .gradient-primary { background: var(--gradient-primary); }
-  .gradient-secondary { background: var(--gradient-secondary); }
-  .shadow-glow { box-shadow: var(--shadow-glow); }
   .shadow-soft { box-shadow: var(--shadow-soft); }
   .shadow-medium { box-shadow: var(--shadow-medium); }
+  .shadow-dialog { box-shadow: 0 4px 12px hsl(var(--shadow-dialog)); }
+  .excel-border { border: 1px solid hsl(var(--excel-border)); }
+  .excel-grid-bg { background-color: hsl(var(--excel-grid)); }
+  .excel-header-bg { background-color: hsl(var(--excel-header)); }
+  .excel-hover:hover { background-color: hsl(var(--excel-hover)); }
+  .excel-selected { background-color: hsl(var(--excel-selected)); }
   .animate-scroll-up { animation: scrollUp var(--scroll-duration, 10s) linear infinite; }
   .animate-scroll-left { animation: scrollLeft var(--scroll-duration, 10s) linear infinite; }
   .animate-scroll-right { animation: scrollRight var(--scroll-duration, 10s) linear infinite; }
