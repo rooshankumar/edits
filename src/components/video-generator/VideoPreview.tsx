@@ -268,17 +268,30 @@ export const VideoPreview = forwardRef<HTMLDivElement, VideoPreviewProps>(
                 style={{ opacity: transitionOpacity.endingOpacity, transition: 'opacity 0.5s ease-in-out' }}
               >
                 {project.ending.showLogo && project.ending.logo && (
-                  <img src={project.ending.logo} alt="Logo" className="max-w-[40%] max-h-[30%] object-contain" />
+                  <img 
+                    src={project.ending.logo} 
+                    alt="Logo" 
+                    style={{
+                      width: `${project.ending.logoSize * scaleFactor}px`,
+                      height: 'auto',
+                      objectFit: 'contain'
+                    }}
+                  />
                 )}
                 <p className="font-bold text-center" style={{ 
                   color: project.text.color,
                   fontSize: `${project.ending.ctaFontSize * scaleFactor}px`
                 }}>{project.ending.ctaText}</p>
                 {project.ending.showQR && project.ending.qrCode && (
-                  <img src={project.ending.qrCode} alt="QR" style={{
-                    width: `${project.ending.qrSize * scaleFactor}px`,
-                    height: `${project.ending.qrSize * scaleFactor}px`
-                  }} className="bg-white p-2 rounded" />
+                  <img 
+                    src={project.ending.qrCode} 
+                    alt="QR" 
+                    style={{
+                      width: `${project.ending.qrSize * scaleFactor}px`,
+                      height: `${project.ending.qrSize * scaleFactor}px`
+                    }} 
+                    className="bg-white p-2 rounded" 
+                  />
                 )}
               </div>
             )}
