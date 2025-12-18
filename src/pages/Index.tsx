@@ -101,8 +101,8 @@ export default function Index() {
       <header className="h-9 md:h-9 flex items-center justify-between px-2 md:px-3 border-b border-border bg-card shrink-0">
         <div className="flex items-center gap-2">
           <h1 className="text-xs md:text-sm font-semibold text-foreground">
-            <span className="hidden sm:inline">ScrollVid - Video Editor</span>
-            <span className="sm:hidden">ScrollVid</span>
+            <span className="hidden sm:inline">editbyroshlingua</span>
+            <span className="sm:hidden">editbyrosh</span>
           </h1>
         </div>
         <ProjectManager 
