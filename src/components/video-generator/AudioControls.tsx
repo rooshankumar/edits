@@ -57,14 +57,17 @@ export function AudioControls({ settings, onChange }: AudioControlsProps) {
       ) : (
         <div className="space-y-2 border border-border bg-card">
           {/* File info */}
-          <div className="flex items-center gap-2 px-3 py-2 border-b border-border excel-hover">
+          <div className="relative flex items-center gap-2 px-3 py-2 pr-9 border-b border-border excel-hover">
             <Music className="w-4 h-4 text-primary" />
-            <span className="flex-1 text-xs font-medium truncate">
+            <span
+              className="flex-1 w-0 min-w-0 truncate whitespace-nowrap overflow-hidden text-[11px] leading-tight font-medium"
+              title={settings.fileName ?? undefined}
+            >
               {settings.fileName}
             </span>
             <button
               onClick={handleRemove}
-              className="p-1 hover:bg-destructive/10 text-destructive transition-colors"
+              className="absolute right-2 top-1/2 -translate-y-1/2 p-1 hover:bg-destructive/10 text-destructive transition-colors"
             >
               <X className="w-3.5 h-3.5" />
             </button>

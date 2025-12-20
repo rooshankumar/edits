@@ -123,7 +123,7 @@ export function CompactEditor({
   const wpmLevel = getWPMLevel(timeline.targetWPM);
 
   return (
-    <ScrollArea className="h-full">
+    <ScrollArea className="h-full min-h-0">
       <div className="divide-y divide-border">
         {/* Canvas Format */}
         <div className="p-3 bg-card border-b border-border">

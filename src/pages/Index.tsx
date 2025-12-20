@@ -100,10 +100,11 @@ export default function Index() {
       {/* Header - Excel Style - Mobile Responsive */}
       <header className="h-9 md:h-9 flex items-center justify-between px-2 md:px-3 border-b border-border bg-card shrink-0">
         <div className="flex items-center gap-2">
-          <h1 className="text-xs md:text-sm font-semibold text-foreground">
-            <span className="hidden sm:inline">editbyroshlingua</span>
+          <img src="/globe-favicon.png" alt="roshLingua Logo" title="editbyroshlingua" className="h-6" />
+          <span className="text-xs md:text-sm font-semibold text-foreground whitespace-nowrap">
+            <span className="hidden sm:inline">editbyroshLingua</span>
             <span className="sm:hidden">editbyrosh</span>
-          </h1>
+          </span>
         </div>
         <ProjectManager 
           project={project} 
@@ -119,21 +120,23 @@ export default function Index() {
       </header>
 
       {/* Main Editor Layout - Excel Style - Mobile Responsive */}
-      <div className="flex-1 flex overflow-hidden">
+      <div className="flex-1 flex overflow-hidden min-h-0">
         {/* Left Sidebar - Property Panel - Hidden on mobile, show as bottom sheet */}
-        <aside className="hidden md:block w-64 max-w-[280px] border-r border-border bg-excel-header shrink-0 overflow-hidden">
-          <CompactEditor
-            project={project}
-            timeline={timeline}
-            onCanvasFormatChange={setCanvasFormat}
-            onTextChange={updateText}
-            onBackgroundChange={updateBackground}
-            onAnimationChange={updateAnimation}
-            onAudioChange={updateAudio}
-            onWatermarkChange={updateWatermark}
-            onOverlayChange={updateOverlay}
-            onEndingChange={updateEnding}
-          />
+        <aside className="hidden md:flex w-64 max-w-[280px] border-r border-border bg-excel-header shrink-0 overflow-hidden min-h-0 flex-col">
+          <div className="flex-1 min-h-0">
+            <CompactEditor
+              project={project}
+              timeline={timeline}
+              onCanvasFormatChange={setCanvasFormat}
+              onTextChange={updateText}
+              onBackgroundChange={updateBackground}
+              onAnimationChange={updateAnimation}
+              onAudioChange={updateAudio}
+              onWatermarkChange={updateWatermark}
+              onOverlayChange={updateOverlay}
+              onEndingChange={updateEnding}
+            />
+          </div>
         </aside>
 
         {/* Main Preview Area - Mobile Responsive */}
@@ -188,7 +191,7 @@ export default function Index() {
       {showMobileEditor && (
         <div className="md:hidden fixed inset-0 z-50 bg-black/50" onClick={() => setShowMobileEditor(false)}>
           <div 
-            className="absolute bottom-0 left-0 right-0 bg-excel-header border-t border-border max-h-[70vh] overflow-y-auto"
+            className="absolute bottom-0 left-0 right-0 bg-excel-header border-t border-border max-h-[70vh] overflow-hidden flex flex-col"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="sticky top-0 bg-excel-header border-b border-border px-3 py-2 flex items-center justify-between">
@@ -197,18 +200,20 @@ export default function Index() {
                 Close
               </button>
             </div>
-            <CompactEditor
-              project={project}
-              timeline={timeline}
-              onCanvasFormatChange={setCanvasFormat}
-              onTextChange={updateText}
-              onBackgroundChange={updateBackground}
-              onAnimationChange={updateAnimation}
-              onAudioChange={updateAudio}
-              onWatermarkChange={updateWatermark}
-              onOverlayChange={updateOverlay}
-              onEndingChange={updateEnding}
-            />
+            <div className="flex-1 min-h-0">
+              <CompactEditor
+                project={project}
+                timeline={timeline}
+                onCanvasFormatChange={setCanvasFormat}
+                onTextChange={updateText}
+                onBackgroundChange={updateBackground}
+                onAnimationChange={updateAnimation}
+                onAudioChange={updateAudio}
+                onWatermarkChange={updateWatermark}
+                onOverlayChange={updateOverlay}
+                onEndingChange={updateEnding}
+              />
+            </div>
           </div>
         </div>
       )}
