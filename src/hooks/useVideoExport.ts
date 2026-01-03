@@ -220,12 +220,11 @@ export function useVideoExport() {
 
       mediaRecorder.start(250);
 
-      // Render animation in real-time
-      const startTime = performance.now();
-      let lastFrameTime = 0;
-      const frameDuration = 1000 / fps;
-      const totalFrames = Math.max(1, Math.ceil(totalDurationSec * fps));
+      // Render animation deterministically in a requestAnimationFrame loop.
+      // We stop recording when we reach the planned end time (or audio end time),
+      // instead of trusting a fixed frame count (MediaRecorder can overshoot).
       let frameIndex = 0;
+      const totalFrames = Math.max(1, Math.ceil(totalDurationSec * fps));
 
       const karaokeLrcRawStatic = (project.lyrics.timingSource === 'lrc' && project.lyrics.karaokeLrc.trim().length > 0)
         ? parseKaraokeLrc(project.lyrics.karaokeLrc)
@@ -780,12 +779,17 @@ export function useVideoExport() {
         }
 
         // Update progress
-        const progress = Math.round((frameIndex / totalFrames) * 100);
+        const progress = Math.round((currentTimeSec / Math.max(0.000001, totalDurationSec)) * 100);
         setExportState(prev => ({ ...prev, progress }));
 
         // Continue rendering if not done
         frameIndex++;
-        if (frameIndex <= totalFrames) {
+        // If audio is present, let it be authoritative for deciding when we are done.
+        const shouldStop = (audioElapsed != null)
+          ? audioElapsed >= totalDurationSec
+          : plannedTime >= totalDurationSec;
+
+        if (!shouldStop && frameIndex <= totalFrames + 2) {
           // Keep UI responsive but render deterministically
           requestAnimationFrame(renderFrame);
         } else {
@@ -803,7 +807,7 @@ export function useVideoExport() {
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      const extension = format === 'mp4' ? 'mp4' : 'webm';
+      const extension = mimeType.includes('video/mp4') ? 'mp4' : 'webm';
       a.download = `${project.name.replace(/[^a-z0-9]/gi, '_')}_${Date.now()}.${extension}`;
       document.body.appendChild(a);
       a.click();
