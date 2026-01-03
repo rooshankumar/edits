@@ -28,6 +28,7 @@ export default function Index() {
   const [showMobileEditor, setShowMobileEditor] = useState(false);
   const animationRef = useRef<number | null>(null);
   const startTimeRef = useRef<number | null>(null);
+  const wasPlayingRef = useRef(false);
 
   // Use unified timeline engine - SINGLE SOURCE OF TRUTH
   const timeline = computeTimeline(
@@ -38,7 +39,7 @@ export default function Index() {
     project.ending.duration
   );
 
-  const useAudioClock = project.theme === 'lyrics' && project.lyrics.timingSource === 'lrc' && !!project.audio.file;
+  const useAudioClock = !!project.audio.file;
 
   // Ensure we always know the real audio duration (needed for auto-fit and correct timeline)
   useEffect(() => {
@@ -73,31 +74,49 @@ export default function Index() {
     };
   }, [project.audio.duration, project.audio.file, project.audio.loop, updateAudio, useAudioClock]);
 
-  // Animation loop - uses unified timeline
+  // Keep audio element settings in sync (without restarting playback)
   useEffect(() => {
+    const el = audioRef.current;
+    if (!el || !project.audio.file) return;
+    el.volume = project.audio.volume / 100;
+    el.loop = project.audio.loop;
+  }, [project.audio.file, project.audio.loop, project.audio.volume]);
+
+  // Animation loop - uses unified timeline; when audio exists it is the authoritative clock.
+  useEffect(() => {
+    const el = audioRef.current;
+    const wasPlaying = wasPlayingRef.current;
+
+    // Track transitions explicitly
+    wasPlayingRef.current = isPlaying;
+
     if (isPlaying) {
-      if (useAudioClock && audioRef.current && project.audio.file) {
-        audioRef.current.currentTime = currentTime;
-        audioRef.current.volume = project.audio.volume / 100;
-        audioRef.current.loop = project.audio.loop;
-        audioRef.current.play().catch(() => {});
+      if (useAudioClock && el && project.audio.file) {
+        // Only seek when we are starting playback (prevents crackling from repeated seeks)
+        if (!wasPlaying && Math.abs(el.currentTime - currentTime) > 0.05) {
+          el.currentTime = currentTime;
+        }
+
+        if (!wasPlaying) {
+          el.play().catch(() => {});
+        }
       } else {
         startTimeRef.current = performance.now() - (currentTime * 1000);
       }
-      
+
       const animate = (now: number) => {
-        const elapsed = (useAudioClock && audioRef.current)
-          ? audioRef.current.currentTime
+        const elapsed = (useAudioClock && el)
+          ? el.currentTime
           : (() => {
             if (!startTimeRef.current) startTimeRef.current = now;
             return (now - startTimeRef.current) / 1000;
           })();
-        
+
         if (elapsed >= timeline.totalDuration) {
           if (project.animation.isLooping) {
-            if (useAudioClock && audioRef.current) {
-              audioRef.current.currentTime = 0;
-              audioRef.current.play().catch(() => {});
+            if (useAudioClock && el) {
+              el.currentTime = 0;
+              el.play().catch(() => {});
             } else {
               startTimeRef.current = now;
             }
@@ -110,22 +129,22 @@ export default function Index() {
         } else {
           setCurrentTime(elapsed);
         }
-        
+
         animationRef.current = requestAnimationFrame(animate);
       };
-      
+
       animationRef.current = requestAnimationFrame(animate);
-      
+
       return () => {
-        if (animationRef.current) {
-          cancelAnimationFrame(animationRef.current);
-        }
+        if (animationRef.current) cancelAnimationFrame(animationRef.current);
       };
     }
-    if (!isPlaying && useAudioClock && audioRef.current) {
-      audioRef.current.pause();
+
+    if (!isPlaying && useAudioClock && el) {
+      // Only pause when transitioning from playing -> paused
+      if (wasPlaying) el.pause();
     }
-  }, [isPlaying, project.animation.isLooping, project.audio.file, project.audio.loop, project.audio.volume, timeline.totalDuration, useAudioClock]);
+  }, [currentTime, isPlaying, project.animation.isLooping, project.audio.file, timeline.totalDuration, useAudioClock]);
 
   const handlePlayPause = useCallback(() => {
     if (!isPlaying && currentTime >= timeline.totalDuration) {
@@ -140,6 +159,7 @@ export default function Index() {
     setCurrentTime(0);
     startTimeRef.current = null;
     if (audioRef.current) audioRef.current.currentTime = 0;
+    wasPlayingRef.current = false;
   }, []);
 
   const handleSeek = useCallback((time: number) => {
@@ -184,6 +204,7 @@ export default function Index() {
             <CompactEditor
               project={project}
               timeline={timeline}
+              onProjectChange={updateProject}
               onThemeChange={setTheme}
               onLyricsChange={updateLyrics}
               onCanvasFormatChange={setCanvasFormat}
@@ -264,6 +285,7 @@ export default function Index() {
               <CompactEditor
                 project={project}
                 timeline={timeline}
+                onProjectChange={updateProject}
                 onThemeChange={setTheme}
                 onLyricsChange={updateLyrics}
                 onCanvasFormatChange={setCanvasFormat}

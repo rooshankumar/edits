@@ -11,6 +11,8 @@ export type WatermarkPosition = 'top-left' | 'top-right' | 'bottom-left' | 'bott
 export type OverlayPosition = 'top' | 'bottom';
 export type WPMPreset = 'beginner' | 'average' | 'comfortable' | 'fast' | 'custom';
 
+export type TextMode = 'scroll' | 'pages';
+
 export interface TextSettings {
   content: string;
   fontFamily: string;
@@ -26,6 +28,25 @@ export interface TextSettings {
   paddingY: number;
   containerWidth: number;
   waveAnimation: boolean;
+}
+
+export interface PagedTextPage {
+  id: string;
+  text: string;
+}
+
+export interface SentenceTiming {
+  sentenceId: string;
+  text: string;
+  pageId: string;
+  startTime: number;
+  endTime: number;
+}
+
+export interface PagedTextSettings {
+  mode: TextMode;
+  pages: PagedTextPage[];
+  sentences: SentenceTiming[];
 }
 
 export interface BackgroundSettings {
@@ -104,6 +125,7 @@ export interface VideoProject {
   lyrics: LyricsThemeSettings;
   canvasFormat: CanvasFormat;
   text: TextSettings;
+  pagedText: PagedTextSettings;
   background: BackgroundSettings;
   animation: AnimationSettings;
   audio: AudioSettings;
@@ -123,6 +145,12 @@ export const CANVAS_SIZES: Record<CanvasFormat, { width: number; height: number;
   'instagram-post': { width: 1080, height: 1350, label: 'IG Post 4:5' },
   twitter: { width: 1280, height: 720, label: 'Twitter 16:9' },
   'facebook-cover': { width: 820, height: 312, label: 'FB Cover' },
+};
+
+export const PAGE_CHAR_LIMITS: Record<'vertical' | 'square' | 'horizontal', { min: number; max: number; recommended: number }> = {
+  vertical: { min: 150, max: 180, recommended: 180 },
+  square: { min: 180, max: 220, recommended: 220 },
+  horizontal: { min: 260, max: 320, recommended: 320 },
 };
 
 export const WPM_PRESETS: Record<WPMPreset, { label: string; wpm: number; description: string }> = {
@@ -187,10 +215,15 @@ export const DEFAULT_PROJECT: Omit<VideoProject, 'id' | 'createdAt' | 'updatedAt
     letterSpacing: 0,
     textAlign: 'center',
     color: '#ffffff',
-    paddingX: 40,
+    paddingX: 18,
     paddingY: 40,
-    containerWidth: 90,
+    containerWidth: 98,
     waveAnimation: false,
+  },
+  pagedText: {
+    mode: 'scroll',
+    pages: [{ id: 'p1', text: '' }],
+    sentences: [],
   },
   background: {
     color: '#1a1a2e',

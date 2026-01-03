@@ -56,6 +56,7 @@ export function useVideoExport() {
       let audioContext: AudioContext | null = null;
       let audioBuffer: AudioBuffer | null = null;
       let audioDestination: MediaStreamAudioDestinationNode | null = null;
+      let audioStartAt: number | null = null;
       
       if (project.audio.file) {
         try {
@@ -156,6 +157,7 @@ export function useVideoExport() {
         
         // Start audio playback
         if (audioContext && audioBuffer) {
+          audioStartAt = audioContext.currentTime + 0.05;
           const source = audioContext.createBufferSource();
           source.buffer = audioBuffer;
           source.loop = project.audio.loop;
@@ -165,11 +167,13 @@ export function useVideoExport() {
           
           source.connect(gainNode);
           gainNode.connect(audioDestination);
-          source.start(0);
+          source.start(audioStartAt);
           
-          const fadeStartTime = Math.max(0, timeline.totalDuration - 0.5);
-          gainNode.gain.setValueAtTime(project.audio.volume / 100, audioContext.currentTime + fadeStartTime);
-          gainNode.gain.linearRampToValueAtTime(0, audioContext.currentTime + timeline.totalDuration);
+          const fadeLead = 0.5;
+          const fadeStartAt = audioStartAt + Math.max(0, timeline.totalDuration - fadeLead);
+          const fadeEndAt = audioStartAt + timeline.totalDuration;
+          gainNode.gain.setValueAtTime(project.audio.volume / 100, fadeStartAt);
+          gainNode.gain.linearRampToValueAtTime(0, fadeEndAt);
         }
       } else {
         combinedStream = videoStream;
@@ -179,7 +183,8 @@ export function useVideoExport() {
       const mimeType = format === 'webm' ? 'video/webm;codecs=vp9' : 'video/webm;codecs=vp8';
       const mediaRecorder = new MediaRecorder(combinedStream, { 
         mimeType, 
-        videoBitsPerSecond: bitrate 
+        videoBitsPerSecond: bitrate,
+        audioBitsPerSecond: 192000,
       });
 
       const chunks: Blob[] = [];
@@ -190,7 +195,7 @@ export function useVideoExport() {
         mediaRecorder.onerror = (e) => reject(e);
       });
 
-      mediaRecorder.start();
+      mediaRecorder.start(250);
 
       // Render animation in real-time
       const startTime = performance.now();
@@ -259,7 +264,10 @@ export function useVideoExport() {
         }
 
         const elapsed = (performance.now() - startTime) / 1000;
-        const currentTimeSec = Math.min(elapsed, totalDurationSec);
+        const audioElapsed = (audioContext && audioStartAt != null)
+          ? Math.max(0, audioContext.currentTime - audioStartAt)
+          : null;
+        const currentTimeSec = Math.min(audioElapsed ?? elapsed, totalDurationSec);
         
         // Use unified scroll state calculation - MATCHES PREVIEW EXACTLY
         const scrollState = computeScrollState(

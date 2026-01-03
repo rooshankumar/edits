@@ -30,6 +30,7 @@ import { parseKaraokeLrc } from '@/utils/karaokeLrc';
 interface CompactEditorProps {
   project: VideoProject;
   timeline: TimelineState;
+  onProjectChange: (updates: Partial<VideoProject>) => void;
   onThemeChange: (theme: VideoTheme) => void;
   onLyricsChange: (updates: Partial<LyricsThemeSettings>) => void;
   onCanvasFormatChange: (format: CanvasFormat) => void;
@@ -91,6 +92,7 @@ const canvasOptions: { value: CanvasFormat; label: string }[] = [
 export function CompactEditor({
   project,
   timeline,
+  onProjectChange,
   onThemeChange,
   onLyricsChange,
   onCanvasFormatChange,
@@ -104,6 +106,8 @@ export function CompactEditor({
 }: CompactEditorProps) {
   const imageInputRef = useRef<HTMLInputElement>(null);
   const videoInputRef = useRef<HTMLInputElement>(null);
+
+  const [activePageIndex, setActivePageIndex] = useState(0);
 
   const karaokeMeta = useMemo(() => {
     if (project.theme !== 'lyrics') return null;
@@ -125,6 +129,28 @@ export function CompactEditor({
     }
     return project.text.content;
   }, [karaokeMeta?.plainText, project.lyrics.timingSource, project.text.content, project.theme]);
+
+  const pagedCharLimit = useMemo(() => {
+    const f = project.canvasFormat;
+    if (f === 'horizontal' || f === 'twitter') return 320;
+    if (f === 'square') return 220;
+    return 180;
+  }, [project.canvasFormat]);
+
+  const effectivePages = useMemo(() => {
+    const pages = project.pagedText?.pages ?? [];
+    if (pages.length > 0) return pages;
+    return [{ id: 'p1', text: '' }];
+  }, [project.pagedText?.pages]);
+
+  const safeActivePageIndex = useMemo(() => {
+    const max = Math.max(0, effectivePages.length - 1);
+    return Math.max(0, Math.min(activePageIndex, max));
+  }, [activePageIndex, effectivePages.length]);
+
+  const activePage = effectivePages[safeActivePageIndex];
+
+  const activePageText = (activePage?.text ?? '').toString();
 
   const effectiveWordCount = useMemo(() => {
     return (effectiveTextContent || '').split(/\s+/).filter((w) => w.length > 0).length;
@@ -423,41 +449,127 @@ export function CompactEditor({
         <Section title="Text" icon={<Type className="w-3 h-3" />}>
           <div>
             <label className="text-[10px] font-medium text-muted-foreground mb-1 block">Content</label>
-            <Textarea
-              value={effectiveTextContent}
-              onChange={(e) => {
-                if (!(project.theme === 'lyrics' && project.lyrics.timingSource === 'lrc')) {
-                  onTextChange({ content: e.target.value });
-                }
-              }}
-              readOnly={project.theme === 'lyrics' && project.lyrics.timingSource === 'lrc'}
-              placeholder="Enter your scrolling text..."
-              className="min-h-[80px] resize-none border-border text-xs"
-            />
-            <div className="flex items-center justify-between mt-1">
-              <div className="flex items-center gap-1">
-                {(() => {
-                  const lengthInfo = getContentLengthCategory(effectiveWordCount);
-                  return (
-                    <>
-                      <span className={cn(
-                        'text-[9px] px-1.5 py-0.5 rounded font-medium',
-                        lengthInfo.category === 'short' && 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300',
-                        lengthInfo.category === 'medium' && 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300',
-                        lengthInfo.category === 'long' && 'bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-300',
-                        lengthInfo.category === 'very-long' && 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300'
-                      )}>
-                        {lengthInfo.label}
-                      </span>
-                      <span className="text-[9px] text-muted-foreground">{lengthInfo.description}</span>
-                    </>
-                  );
-                })()}
-              </div>
-              <p className="text-[10px] text-muted-foreground">
-                {effectiveWordCount} words
-              </p>
-            </div>
+            {project.theme === 'lyrics' && project.pagedText?.mode === 'pages' && project.lyrics.timingSource !== 'lrc' ? (
+              <>
+                <div className="flex items-center justify-between">
+                  <div className="text-[10px] text-muted-foreground">
+                    Page {safeActivePageIndex + 1} / {effectivePages.length}
+                  </div>
+                  <div className={cn(
+                    'text-[10px] font-mono',
+                    activePageText.length >= pagedCharLimit ? 'text-yellow-600 dark:text-yellow-400' : 'text-muted-foreground'
+                  )}>
+                    {activePageText.length} / {pagedCharLimit}
+                  </div>
+                </div>
+                <Textarea
+                  value={activePageText}
+                  onChange={(e) => {
+                    const next = e.target.value;
+                    if (next.length > pagedCharLimit) return;
+
+                    const nextPages = effectivePages.map((p, i) => i === safeActivePageIndex ? { ...p, text: next } : p);
+                    onProjectChange({
+                      pagedText: {
+                        ...project.pagedText,
+                        pages: nextPages,
+                      },
+                      text: {
+                        ...project.text,
+                        content: nextPages.map((p) => p.text).join('\n\n'),
+                      },
+                    });
+                  }}
+                  onKeyDown={(e) => {
+                    const isInsert = e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey;
+                    const isDelete = e.key === 'Backspace' || e.key === 'Delete';
+                    if (!isDelete && isInsert && activePageText.length >= pagedCharLimit) {
+                      e.preventDefault();
+                    }
+                  }}
+                  placeholder="Type the lesson text for this page..."
+                  className="min-h-[90px] resize-none border-border text-xs"
+                />
+                <div className="flex items-center justify-between mt-2">
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() => setActivePageIndex((i) => Math.max(0, i - 1))}
+                      className="px-2 py-1 text-[10px] border border-border bg-card hover:bg-excel-hover rounded disabled:opacity-50"
+                      disabled={safeActivePageIndex === 0}
+                    >
+                      Prev
+                    </button>
+                    <button
+                      onClick={() => setActivePageIndex((i) => Math.min(effectivePages.length - 1, i + 1))}
+                      className="px-2 py-1 text-[10px] border border-border bg-card hover:bg-excel-hover rounded disabled:opacity-50"
+                      disabled={safeActivePageIndex >= effectivePages.length - 1}
+                    >
+                      Next
+                    </button>
+                  </div>
+                  {activePageText.length >= pagedCharLimit && (
+                    <button
+                      onClick={() => {
+                        const newId = `p${effectivePages.length + 1}`;
+                        const nextPages = [...effectivePages, { id: newId, text: '' }];
+                        onProjectChange({
+                          pagedText: {
+                            ...project.pagedText,
+                            pages: nextPages,
+                          },
+                          text: {
+                            ...project.text,
+                            content: nextPages.map((p) => p.text).join('\n\n'),
+                          },
+                        });
+                        setActivePageIndex(nextPages.length - 1);
+                      }}
+                      className="px-2 py-1 text-[10px] border border-primary bg-primary/10 text-primary hover:bg-primary/20 rounded"
+                    >
+                      ➕ Add Page
+                    </button>
+                  )}
+                </div>
+              </>
+            ) : (
+              <>
+                <Textarea
+                  value={effectiveTextContent}
+                  onChange={(e) => {
+                    if (!(project.theme === 'lyrics' && project.lyrics.timingSource === 'lrc')) {
+                      onTextChange({ content: e.target.value });
+                    }
+                  }}
+                  readOnly={project.theme === 'lyrics' && project.lyrics.timingSource === 'lrc'}
+                  placeholder="Enter your scrolling text..."
+                  className="min-h-[80px] resize-none border-border text-xs"
+                />
+                <div className="flex items-center justify-between mt-1">
+                  <div className="flex items-center gap-1">
+                    {(() => {
+                      const lengthInfo = getContentLengthCategory(effectiveWordCount);
+                      return (
+                        <>
+                          <span className={cn(
+                            'text-[9px] px-1.5 py-0.5 rounded font-medium',
+                            lengthInfo.category === 'short' && 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300',
+                            lengthInfo.category === 'medium' && 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300',
+                            lengthInfo.category === 'long' && 'bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-300',
+                            lengthInfo.category === 'very-long' && 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300'
+                          )}>
+                            {lengthInfo.label}
+                          </span>
+                          <span className="text-[9px] text-muted-foreground">{lengthInfo.description}</span>
+                        </>
+                      );
+                    })()}
+                  </div>
+                  <p className="text-[10px] text-muted-foreground">
+                    {effectiveWordCount} words
+                  </p>
+                </div>
+              </>
+            )}
           </div>
 
           {/* Font + Size */}
@@ -482,13 +594,40 @@ export function CompactEditor({
               <Slider
                 value={[project.text.fontSize]}
                 onValueChange={([v]) => onTextChange({ fontSize: v })}
-                min={16}
-                max={120}
-                step={2}
+                min={20}
+                max={160}
+                step={1}
                 className="mt-2"
               />
             </div>
           </div>
+
+          {/* Quick layout presets (useful for vertical lesson text) */}
+          {project.theme !== 'lyrics' && (
+            <div>
+              <label className="text-[10px] font-medium text-muted-foreground mb-1 block">Layout presets</label>
+              <div className="grid grid-cols-3 gap-1.5">
+                <button
+                  onClick={() => onTextChange({ containerWidth: 98, paddingX: 18, textAlign: 'center', lineHeight: 1.6 })}
+                  className="px-2 py-1 text-[10px] border border-border bg-card hover:bg-excel-hover rounded"
+                >
+                  Classroom
+                </button>
+                <button
+                  onClick={() => onTextChange({ containerWidth: 92, paddingX: 24, textAlign: 'center', lineHeight: 1.45 })}
+                  className="px-2 py-1 text-[10px] border border-border bg-card hover:bg-excel-hover rounded"
+                >
+                  Subtitle
+                </button>
+                <button
+                  onClick={() => onTextChange({ containerWidth: 80, paddingX: 44, textAlign: 'left', lineHeight: 1.55 })}
+                  className="px-2 py-1 text-[10px] border border-border bg-card hover:bg-excel-hover rounded"
+                >
+                  Narrow
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* Style buttons */}
           <div>
