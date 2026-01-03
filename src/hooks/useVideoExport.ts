@@ -180,7 +180,30 @@ export function useVideoExport() {
       }
 
       // Use MediaRecorder for fast export
-      const mimeType = format === 'webm' ? 'video/webm;codecs=vp9' : 'video/webm;codecs=vp8';
+      const pickMimeType = (): string => {
+        if (format === 'mp4') {
+          const mp4Candidates = [
+            'video/mp4;codecs=avc1.42E01E,mp4a.40.2',
+            'video/mp4;codecs=avc1,mp4a',
+            'video/mp4',
+          ];
+          for (const c of mp4Candidates) {
+            if ((window as any).MediaRecorder?.isTypeSupported?.(c)) return c;
+          }
+        }
+
+        const webmCandidates = format === 'webm'
+          ? ['video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm']
+          : ['video/webm;codecs=vp8,opus', 'video/webm'];
+
+        for (const c of webmCandidates) {
+          if ((window as any).MediaRecorder?.isTypeSupported?.(c)) return c;
+        }
+
+        return 'video/webm';
+      };
+
+      const mimeType = pickMimeType();
       const mediaRecorder = new MediaRecorder(combinedStream, { 
         mimeType, 
         videoBitsPerSecond: bitrate,
@@ -201,6 +224,8 @@ export function useVideoExport() {
       const startTime = performance.now();
       let lastFrameTime = 0;
       const frameDuration = 1000 / fps;
+      const totalFrames = Math.max(1, Math.ceil(totalDurationSec * fps));
+      let frameIndex = 0;
 
       const karaokeLrcRawStatic = (project.lyrics.timingSource === 'lrc' && project.lyrics.karaokeLrc.trim().length > 0)
         ? parseKaraokeLrc(project.lyrics.karaokeLrc)
@@ -263,11 +288,13 @@ export function useVideoExport() {
           throw new Error('Export cancelled'); 
         }
 
-        const elapsed = (performance.now() - startTime) / 1000;
+        // Deterministic frame time (smooth export). When audio is available, prefer audio clock
+        // but never allow time to go backwards.
+        const plannedTime = Math.min(totalDurationSec, frameIndex / fps);
         const audioElapsed = (audioContext && audioStartAt != null)
           ? Math.max(0, audioContext.currentTime - audioStartAt)
           : null;
-        const currentTimeSec = Math.min(audioElapsed ?? elapsed, totalDurationSec);
+        const currentTimeSec = Math.min(totalDurationSec, Math.max(plannedTime, audioElapsed ?? 0));
         
         // Use unified scroll state calculation - MATCHES PREVIEW EXACTLY
         const scrollState = computeScrollState(
@@ -411,6 +438,30 @@ export function useVideoExport() {
 
             const fontPrefix = `${project.text.isItalic ? 'italic ' : ''}${project.text.isBold ? 'bold ' : ''}`;
 
+            const wrapText = (text: string, maxWidth: number): string[] => {
+              const raw = (text ?? '').toString();
+              if (raw.trim().length === 0) return [''];
+
+              const words = raw.split(/\s+/).filter(Boolean);
+              if (words.length === 0) return [''];
+
+              const lines: string[] = [];
+              let current = words[0];
+
+              for (let i = 1; i < words.length; i++) {
+                const candidate = `${current} ${words[i]}`;
+                if (ctx.measureText(candidate).width <= maxWidth) {
+                  current = candidate;
+                } else {
+                  lines.push(current);
+                  current = words[i];
+                }
+              }
+
+              lines.push(current);
+              return lines.length > 0 ? lines : [''];
+            };
+
             if (project.lyrics.displayMode === 'lines') {
               // Prev
               ctx.save();
@@ -428,30 +479,35 @@ export function useVideoExport() {
             } else {
               const count = stanza.length;
               const baseFont = Math.round(scaledFontSize * (project.lyrics.displayMode === 'full' ? 0.92 * fullFit : 0.9));
-              const lineGap = Math.round(Math.max(0, (scaledSettings.lineHeight - 1) * baseFont));
-              const blockHeight = (count - 1) * lineGap;
+              const activeScale = project.lyrics.displayMode === 'pages' ? 1.2 : project.lyrics.displayMode === 'full' ? 1.15 : 1.15;
+
+              // Wrap each original stanza line into multiple canvas lines, matching DOM wrapping expectation.
+              // We compute wrapped block height and center it like preview.
+              const wrapped = stanza.map((raw, i) => {
+                const isActive = start + i === lineIndex;
+                const font = isActive ? Math.round(baseFont * activeScale) : baseFont;
+                ctx.font = `${fontPrefix}${font}px ${project.text.fontFamily}`;
+                const wrappedLines = wrapText((raw ?? '').toString(), containerWidth);
+                return { stanzaIndex: i, isActive, font, wrappedLines };
+              });
+
+              // Approx line height for canvas wrapping
+              const lineHeightPx = Math.max(1, baseFont * scaledSettings.lineHeight);
+              const totalWrappedLines = wrapped.reduce((acc, item) => acc + item.wrappedLines.length, 0);
+              const blockHeight = Math.max(0, (totalWrappedLines - 1) * lineHeightPx);
               const topY = centerY - blockHeight / 2;
 
-              for (let i = 0; i < count; i++) {
-                const isActive = start + i === lineIndex;
-                const y = topY + i * lineGap;
-                const activeScale = project.lyrics.displayMode === 'pages' ? 1.2 : project.lyrics.displayMode === 'full' ? 1.15 : 1.15;
-                const font = isActive ? Math.round(baseFont * activeScale) : baseFont;
-                ctx.save();
-                ctx.globalAlpha = transitionOpacity.contentOpacity * (isActive ? 1 : 0.35);
-                ctx.font = `${fontPrefix}${font}px ${project.text.fontFamily}`;
-
-                // Fit long lines into the configured container width by scaling horizontally
-                const text = (stanza[i] ?? '').toString();
-                const measured = ctx.measureText(text).width;
-                const fitX = measured > 0 ? Math.min(1, containerWidth / measured) : 1;
-                ctx.save();
-                ctx.translate(x, y);
-                ctx.scale(fitX, 1);
-                ctx.fillText(text, 0, 0);
-                ctx.restore();
-
-                ctx.restore();
+              let lineCursor = 0;
+              for (const item of wrapped) {
+                for (const l of item.wrappedLines) {
+                  const y = topY + lineCursor * lineHeightPx;
+                  ctx.save();
+                  ctx.globalAlpha = transitionOpacity.contentOpacity * (item.isActive ? 1 : 0.35);
+                  ctx.font = `${fontPrefix}${item.font}px ${project.text.fontFamily}`;
+                  ctx.fillText(l, x, y);
+                  ctx.restore();
+                  lineCursor++;
+                }
               }
             }
 
@@ -724,11 +780,13 @@ export function useVideoExport() {
         }
 
         // Update progress
-        const progress = Math.round((currentTimeSec / totalDurationSec) * 100);
+        const progress = Math.round((frameIndex / totalFrames) * 100);
         setExportState(prev => ({ ...prev, progress }));
 
         // Continue rendering if not done
-        if (currentTimeSec < totalDurationSec) {
+        frameIndex++;
+        if (frameIndex <= totalFrames) {
+          // Keep UI responsive but render deterministically
           requestAnimationFrame(renderFrame);
         } else {
           // Stop recording

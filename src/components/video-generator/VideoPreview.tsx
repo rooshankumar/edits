@@ -612,6 +612,10 @@ export const VideoPreview = forwardRef<HTMLDivElement, VideoPreviewProps>(
                                 const opacity = isActive ? 1 : 0.35;
                                 const lineText = (line || '').toString();
 
+                                // Keep preview stable/perf-friendly: avoid per-render DOM measurement.
+                                // Export uses precise canvas measurement; preview is allowed to wrap.
+                                const fitScaleX = 1;
+
                                 const lineGap = Math.max(0, (scaledSettings.lineHeight - 1) * fontSize);
 
                                 const isActiveWithOverlay = isActive;
@@ -619,7 +623,7 @@ export const VideoPreview = forwardRef<HTMLDivElement, VideoPreviewProps>(
                                 return (
                                   <div
                                     key={`${start + i}-${lineText}`}
-                                    style={{ ...common, opacity, fontSize: `${fontSize}px`, lineHeight: scaledSettings.lineHeight, marginTop: i === 0 ? 0 : `${Math.round(lineGap)}px` }}
+                                    style={{ ...common, opacity, fontSize: `${fontSize}px`, lineHeight: scaledSettings.lineHeight, marginTop: i === 0 ? 0 : `${Math.round(lineGap)}px`, transform: `scaleX(${fitScaleX})`, transformOrigin: project.text.textAlign === 'left' ? 'left center' : project.text.textAlign === 'right' ? 'right center' : 'center center' }}
                                   >
                                     {isActiveWithOverlay ? (
                                       <span className="relative inline-block" style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
