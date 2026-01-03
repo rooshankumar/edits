@@ -15,12 +15,13 @@ import { computeTimeline } from '@/utils/timeline';
 export default function Index() {
   const {
     project, savedProjects, updateProject, updateText, updateBackground,
-    updateAnimation, updateAudio, updateWatermark, updateOverlay, updateEnding,
-    setCanvasFormat, saveProject, loadProject, deleteProject, newProject, duplicateProject,
+    updateAnimation, updateAudio, updateWatermark, updateOverlay, updateEnding, updateLyrics,
+    setCanvasFormat, setTheme, saveProject, loadProject, deleteProject, newProject, duplicateProject,
   } = useVideoProject();
 
   const { exportState, exportVideo, cancelExport } = useVideoExport();
   const previewRef = useRef<HTMLDivElement>(null);
+  const audioRef = useRef<HTMLAudioElement>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [showExportDialog, setShowExportDialog] = useState(false);
@@ -37,18 +38,69 @@ export default function Index() {
     project.ending.duration
   );
 
+  const useAudioClock = project.theme === 'lyrics' && project.lyrics.timingSource === 'lrc' && !!project.audio.file;
+
+  // Ensure we always know the real audio duration (needed for auto-fit and correct timeline)
+  useEffect(() => {
+    if (!useAudioClock) return;
+    const el = audioRef.current;
+    if (!el) return;
+
+    const syncDuration = () => {
+      const d = Number.isFinite(el.duration) ? el.duration : null;
+      const normalized = d && d > 0 ? d : null;
+      const prev = project.audio.duration;
+      if (normalized && (!prev || Math.abs(prev - normalized) > 0.01)) {
+        updateAudio({ duration: normalized });
+      }
+    };
+
+    const onEnded = () => {
+      if (!project.audio.loop) {
+        setIsPlaying(false);
+      }
+    };
+
+    el.addEventListener('loadedmetadata', syncDuration);
+    el.addEventListener('durationchange', syncDuration);
+    el.addEventListener('ended', onEnded);
+    syncDuration();
+
+    return () => {
+      el.removeEventListener('loadedmetadata', syncDuration);
+      el.removeEventListener('durationchange', syncDuration);
+      el.removeEventListener('ended', onEnded);
+    };
+  }, [project.audio.duration, project.audio.file, project.audio.loop, updateAudio, useAudioClock]);
+
   // Animation loop - uses unified timeline
   useEffect(() => {
     if (isPlaying) {
-      startTimeRef.current = performance.now() - (currentTime * 1000);
+      if (useAudioClock && audioRef.current && project.audio.file) {
+        audioRef.current.currentTime = currentTime;
+        audioRef.current.volume = project.audio.volume / 100;
+        audioRef.current.loop = project.audio.loop;
+        audioRef.current.play().catch(() => {});
+      } else {
+        startTimeRef.current = performance.now() - (currentTime * 1000);
+      }
       
       const animate = (now: number) => {
-        if (!startTimeRef.current) startTimeRef.current = now;
-        const elapsed = (now - startTimeRef.current) / 1000;
+        const elapsed = (useAudioClock && audioRef.current)
+          ? audioRef.current.currentTime
+          : (() => {
+            if (!startTimeRef.current) startTimeRef.current = now;
+            return (now - startTimeRef.current) / 1000;
+          })();
         
         if (elapsed >= timeline.totalDuration) {
           if (project.animation.isLooping) {
-            startTimeRef.current = now;
+            if (useAudioClock && audioRef.current) {
+              audioRef.current.currentTime = 0;
+              audioRef.current.play().catch(() => {});
+            } else {
+              startTimeRef.current = now;
+            }
             setCurrentTime(0);
           } else {
             setIsPlaying(false);
@@ -70,7 +122,10 @@ export default function Index() {
         }
       };
     }
-  }, [isPlaying, timeline.totalDuration, project.animation.isLooping]);
+    if (!isPlaying && useAudioClock && audioRef.current) {
+      audioRef.current.pause();
+    }
+  }, [isPlaying, project.animation.isLooping, project.audio.file, project.audio.loop, project.audio.volume, timeline.totalDuration, useAudioClock]);
 
   const handlePlayPause = useCallback(() => {
     if (!isPlaying && currentTime >= timeline.totalDuration) {
@@ -84,11 +139,13 @@ export default function Index() {
     setIsPlaying(false);
     setCurrentTime(0);
     startTimeRef.current = null;
+    if (audioRef.current) audioRef.current.currentTime = 0;
   }, []);
 
   const handleSeek = useCallback((time: number) => {
     setCurrentTime(time);
     startTimeRef.current = performance.now() - (time * 1000);
+    if (audioRef.current) audioRef.current.currentTime = time;
   }, []);
 
   const handleExport = (quality: ExportQuality, format: ExportFormat) => {
@@ -127,6 +184,8 @@ export default function Index() {
             <CompactEditor
               project={project}
               timeline={timeline}
+              onThemeChange={setTheme}
+              onLyricsChange={updateLyrics}
               onCanvasFormatChange={setCanvasFormat}
               onTextChange={updateText}
               onBackgroundChange={updateBackground}
@@ -150,6 +209,7 @@ export default function Index() {
               currentTime={currentTime}
               contentDuration={timeline.contentDuration}
               totalDuration={timeline.totalDuration}
+              audioRef={audioRef}
             />
           </div>
 
@@ -204,6 +264,8 @@ export default function Index() {
               <CompactEditor
                 project={project}
                 timeline={timeline}
+                onThemeChange={setTheme}
+                onLyricsChange={updateLyrics}
                 onCanvasFormatChange={setCanvasFormat}
                 onTextChange={updateText}
                 onBackgroundChange={updateBackground}

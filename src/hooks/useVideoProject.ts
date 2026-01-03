@@ -1,15 +1,81 @@
 import { useState, useCallback, useEffect } from 'react';
-import { 
-  VideoProject, DEFAULT_PROJECT, CanvasFormat, 
+import {
+  VideoProject, DEFAULT_PROJECT, CanvasFormat,
   TextSettings, BackgroundSettings, AnimationSettings, AudioSettings,
-  WatermarkSettings, OverlayTextSettings, EndingSettings,
-  calculateDurationFromWPM, WPM_PRESETS
+  WatermarkSettings, OverlayTextSettings, EndingSettings, LyricsThemeSettings,
+  calculateDurationFromWPM, calculateWPMFromDuration, WPM_PRESETS
 } from '@/types/video-project';
+import { parseKaraokeLrc } from '@/utils/karaokeLrc';
 
 const STORAGE_KEY = 'scrolling-video-projects';
 const CURRENT_PROJECT_KEY = 'scrolling-video-current';
 
 const generateId = () => Math.random().toString(36).substring(2, 15);
+
+const computeLyricsDurationSeconds = (text: string, lyrics: LyricsThemeSettings): number => {
+  const lines = (text || '').split('\n');
+  const cps = Math.max(1, lyrics.charsPerSecond);
+  const minLine = Math.max(0.2, lyrics.minLineDuration);
+  let total = 0;
+
+  lines.forEach((line) => {
+    const normalized = line.replace(/\s+/g, ' ').trim();
+    const chars = normalized.length;
+    const lineSeconds = Math.max(minLine, chars > 0 ? chars / cps : minLine);
+    total += lineSeconds;
+  });
+
+  // Keep some minimum so playback isn't too short
+  return Math.max(3, Math.ceil(total * 10) / 10);
+};
+
+const applyLyricsAutoTiming = (project: VideoProject): VideoProject => {
+  if (project.theme !== 'lyrics') return project;
+
+  if (project.lyrics.timingSource === 'lrc') {
+    const parsed = project.lyrics.karaokeLrc.trim().length > 0
+      ? parseKaraokeLrc(project.lyrics.karaokeLrc)
+      : null;
+
+    if (parsed) {
+      const fittedDuration = (project.lyrics.autoFitLrcToAudio && project.audio.duration && project.audio.duration > 0)
+        ? project.audio.duration
+        : parsed.duration;
+
+      const duration = Math.max(3, Math.ceil(fittedDuration * 10) / 10);
+      const wordCount = parsed.plainText.split(/\s+/).filter(w => w.length > 0).length;
+      const targetWPM = calculateWPMFromDuration(wordCount, duration);
+
+      return {
+        ...project,
+        animation: {
+          ...project.animation,
+          wpmPreset: 'custom',
+          duration,
+          targetWPM,
+        },
+      };
+    }
+
+    return project;
+  }
+
+  if (project.lyrics.pacingSource !== 'chars') return project;
+
+  const duration = computeLyricsDurationSeconds(project.text.content, project.lyrics);
+  const wordCount = project.text.content.split(/\s+/).filter(w => w.length > 0).length;
+  const targetWPM = calculateWPMFromDuration(wordCount, duration);
+
+  return {
+    ...project,
+    animation: {
+      ...project.animation,
+      wpmPreset: 'custom',
+      duration,
+      targetWPM,
+    },
+  };
+};
 
 export function useVideoProject() {
   const [project, setProject] = useState<VideoProject>(() => {
@@ -20,6 +86,7 @@ export function useVideoProject() {
         return {
           ...DEFAULT_PROJECT,
           ...parsed,
+          lyrics: { ...DEFAULT_PROJECT.lyrics, ...parsed.lyrics },
           text: { ...DEFAULT_PROJECT.text, ...parsed.text },
           audio: { ...DEFAULT_PROJECT.audio, ...parsed.audio },
           animation: { ...DEFAULT_PROJECT.animation, ...parsed.animation },
@@ -65,17 +132,28 @@ export function useVideoProject() {
   }, [savedProjects]);
 
   const updateProject = useCallback((updates: Partial<VideoProject>) => {
-    setProject(prev => ({
-      ...prev,
-      ...updates,
-      updatedAt: Date.now(),
-    }));
+    setProject(prev => {
+      const next = {
+        ...prev,
+        ...updates,
+        updatedAt: Date.now(),
+      };
+      return applyLyricsAutoTiming(next);
+    });
   }, []);
 
   const updateText = useCallback((updates: Partial<TextSettings>) => {
     setProject(prev => {
       const newText = { ...prev.text, ...updates };
       const wordCount = newText.content.split(/\s+/).filter(w => w.length > 0).length;
+
+      if (prev.theme === 'lyrics' && (prev.lyrics.timingSource === 'lrc' || prev.lyrics.pacingSource === 'chars')) {
+        return applyLyricsAutoTiming({
+          ...prev,
+          text: newText,
+          updatedAt: Date.now(),
+        });
+      }
       
       // Auto-recalculate duration if WPM preset is not custom
       if (prev.animation.wpmPreset !== 'custom' && updates.content !== undefined) {
@@ -96,6 +174,17 @@ export function useVideoProject() {
     });
   }, []);
 
+  const updateLyrics = useCallback((updates: Partial<LyricsThemeSettings>) => {
+    setProject(prev => {
+      const next = {
+        ...prev,
+        lyrics: { ...prev.lyrics, ...updates },
+        updatedAt: Date.now(),
+      };
+      return applyLyricsAutoTiming(next);
+    });
+  }, []);
+
   const updateBackground = useCallback((updates: Partial<BackgroundSettings>) => {
     setProject(prev => ({
       ...prev,
@@ -106,6 +195,16 @@ export function useVideoProject() {
 
   const updateAnimation = useCallback((updates: Partial<AnimationSettings>) => {
     setProject(prev => {
+      if (prev.theme === 'lyrics' && (prev.lyrics.timingSource === 'lrc' || prev.lyrics.pacingSource === 'chars')) {
+        // In chars pacing mode, animation duration is derived from lyrics.
+        // Allow storing other animation fields, but keep duration auto.
+        return applyLyricsAutoTiming({
+          ...prev,
+          animation: { ...prev.animation, ...updates },
+          updatedAt: Date.now(),
+        });
+      }
+
       const newAnimation = { ...prev.animation, ...updates };
       
       // If WPM preset changed, recalculate duration
@@ -140,11 +239,19 @@ export function useVideoProject() {
   }, []);
 
   const updateAudio = useCallback((updates: Partial<AudioSettings>) => {
-    setProject(prev => ({
-      ...prev,
-      audio: { ...prev.audio, ...updates },
-      updatedAt: Date.now(),
-    }));
+    setProject(prev => {
+      const next = {
+        ...prev,
+        audio: { ...prev.audio, ...updates },
+        updatedAt: Date.now(),
+      };
+
+      if (prev.theme === 'lyrics' && prev.lyrics.timingSource === 'lrc') {
+        return applyLyricsAutoTiming(next);
+      }
+
+      return next;
+    });
   }, []);
 
   const updateWatermark = useCallback((updates: Partial<WatermarkSettings>) => {
@@ -175,6 +282,10 @@ export function useVideoProject() {
     updateProject({ canvasFormat: format });
   }, [updateProject]);
 
+  const setTheme = useCallback((theme: VideoProject['theme']) => {
+    updateProject({ theme });
+  }, [updateProject]);
+
   const saveProject = useCallback(() => {
     setSavedProjects(prev => {
       const existing = prev.findIndex(p => p.id === project.id);
@@ -190,16 +301,17 @@ export function useVideoProject() {
   const loadProject = useCallback((id: string) => {
     const found = savedProjects.find(p => p.id === id);
     if (found) {
-      setProject({
+      setProject(applyLyricsAutoTiming({
         ...DEFAULT_PROJECT,
         ...found,
+        lyrics: { ...DEFAULT_PROJECT.lyrics, ...found.lyrics },
         text: { ...DEFAULT_PROJECT.text, ...found.text },
         audio: { ...DEFAULT_PROJECT.audio, ...found.audio },
         animation: { ...DEFAULT_PROJECT.animation, ...found.animation },
         watermark: { ...DEFAULT_PROJECT.watermark, ...found.watermark },
         overlay: { ...DEFAULT_PROJECT.overlay, ...found.overlay },
         ending: { ...DEFAULT_PROJECT.ending, ...found.ending },
-      });
+      }));
     }
   }, [savedProjects]);
 
@@ -231,6 +343,7 @@ export function useVideoProject() {
     savedProjects,
     updateProject,
     updateText,
+    updateLyrics,
     updateBackground,
     updateAnimation,
     updateAudio,
@@ -238,6 +351,7 @@ export function useVideoProject() {
     updateOverlay,
     updateEnding,
     setCanvasFormat,
+    setTheme,
     saveProject,
     loadProject,
     deleteProject,

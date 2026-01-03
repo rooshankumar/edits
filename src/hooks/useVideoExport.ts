@@ -2,6 +2,7 @@ import { useState, useCallback, useRef } from 'react';
 import { VideoProject, CANVAS_SIZES, ExportQuality, ExportFormat } from '@/types/video-project';
 import { computeTimeline, computeScrollState, calculateScrollPosition, calculateRelativeFontSize, calculateTransitionOpacity } from '@/utils/timeline';
 import { getScaledTextSettings } from '@/utils/textScaling';
+import { parseKaraokeLrc, findActiveKaraokeLineIndex, findKaraokeWordProgress, scaleKaraokeLrc, detectKaraokeStanzaBreaks } from '@/utils/karaokeLrc';
 
 interface ExportState {
   isExporting: boolean;
@@ -43,18 +44,8 @@ export function useVideoExport() {
       const resolution = EXPORT_RESOLUTION_LOCK[project.canvasFormat] || CANVAS_SIZES[project.canvasFormat];
       const { width, height } = resolution;
       const { bitrate, fps } = QUALITY_SETTINGS[quality];
-      
-      // Use unified timeline engine - SINGLE SOURCE OF TRUTH
-      const timeline = computeTimeline(
-        project.text.content,
-        project.animation.wpmPreset,
-        project.animation.wpmPreset === 'custom' ? project.animation.duration : null,
-        project.ending.enabled,
-        project.ending.duration
-      );
-      
-      const totalDurationSec = timeline.totalDuration;
-      const totalFrames = Math.ceil(totalDurationSec * fps);
+
+      // We'll compute the final timeline after we know audio duration (if present).
 
       const canvas = document.createElement('canvas');
       canvas.width = width;
@@ -78,6 +69,33 @@ export function useVideoExport() {
         }
       }
 
+      const audioDurationSec = audioBuffer?.duration ?? null;
+
+      // Use unified timeline engine - SINGLE SOURCE OF TRUTH
+      const timelineBase = computeTimeline(
+        project.text.content,
+        project.animation.wpmPreset,
+        project.animation.wpmPreset === 'custom' ? project.animation.duration : null,
+        project.ending.enabled,
+        project.ending.duration
+      );
+
+      // If we're auto-fitting LRC to audio, content duration should follow the audio duration
+      // so the frame timing matches the stretched LRC timestamps.
+      const timeline = (project.theme === 'lyrics'
+        && project.lyrics.timingSource === 'lrc'
+        && project.lyrics.autoFitLrcToAudio
+        && audioDurationSec
+        && audioDurationSec > 0)
+        ? {
+          ...timelineBase,
+          contentDuration: audioDurationSec,
+          totalDuration: audioDurationSec + (timelineBase.endingDuration ?? 0),
+        }
+        : timelineBase;
+
+      const totalDurationSec = timeline.totalDuration;
+
       // Preload images
       let bgImage: HTMLImageElement | null = null;
       let watermarkImage: HTMLImageElement | null = null;
@@ -96,8 +114,12 @@ export function useVideoExport() {
       if (project.ending.enabled && project.ending.showLogo && project.ending.logo) endingLogo = await loadImage(project.ending.logo);
       if (project.ending.enabled && project.ending.showQR && project.ending.qrCode) endingQR = await loadImage(project.ending.qrCode);
 
+      const karaokeLrcForScaling = (project.theme === 'lyrics' && project.lyrics.timingSource === 'lrc' && project.lyrics.karaokeLrc.trim().length > 0)
+        ? parseKaraokeLrc(project.lyrics.karaokeLrc)
+        : null;
+
       // Calculate word count for auto-scaling
-      const wordCount = project.text.content.split(/\s+/).filter(w => w.length > 0).length;
+      const wordCount = ((karaokeLrcForScaling?.plainText ?? project.text.content) || '').split(/\s+/).filter(w => w.length > 0).length;
       
       // Get scaled settings based on content length
       const scaledSettings = getScaledTextSettings(
@@ -174,6 +196,60 @@ export function useVideoExport() {
       const startTime = performance.now();
       let lastFrameTime = 0;
       const frameDuration = 1000 / fps;
+
+      const karaokeLrcRawStatic = (project.lyrics.timingSource === 'lrc' && project.lyrics.karaokeLrc.trim().length > 0)
+        ? parseKaraokeLrc(project.lyrics.karaokeLrc)
+        : null;
+
+      const karaokeLrcStatic = (karaokeLrcRawStatic && project.lyrics.autoFitLrcToAudio && audioDurationSec && audioDurationSec > 0 && karaokeLrcRawStatic.duration > 0)
+        ? scaleKaraokeLrc(karaokeLrcRawStatic, audioDurationSec / karaokeLrcRawStatic.duration)
+        : karaokeLrcRawStatic;
+
+      const stanzaBreaksStatic = (project.lyrics.timingSource === 'lrc' && project.lyrics.karaokeLrc.trim().length > 0)
+        ? detectKaraokeStanzaBreaks(project.lyrics.karaokeLrc)
+        : [];
+
+      const lyricLinesStatic = karaokeLrcStatic
+        ? karaokeLrcStatic.lines.map((l) => l.text)
+        : (project.text.content || '').split('\n');
+
+      const totalLinesStatic = Math.max(1, lyricLinesStatic.length);
+
+      const safeContentDurationStatic = Math.max(0.000001, timeline.contentDuration);
+      const lineDurationsStatic = new Array<number>(totalLinesStatic).fill(0);
+      const lineStartsStatic = new Array<number>(totalLinesStatic).fill(0);
+
+      if (karaokeLrcStatic) {
+        for (let i = 0; i < karaokeLrcStatic.lines.length; i++) {
+          lineDurationsStatic[i] = Math.max(0, karaokeLrcStatic.lines[i].end - karaokeLrcStatic.lines[i].start);
+          lineStartsStatic[i] = karaokeLrcStatic.lines[i].start;
+        }
+      } else {
+        if (project.lyrics.pacingSource === 'chars') {
+          const cps = Math.max(1, project.lyrics.charsPerSecond);
+          const minLine = Math.max(0.2, project.lyrics.minLineDuration);
+          for (let i = 0; i < totalLinesStatic; i++) {
+            const normalized = (lyricLinesStatic[i] ?? '').replace(/\s+/g, ' ').trim();
+            const chars = normalized.length;
+            lineDurationsStatic[i] = Math.max(minLine, chars > 0 ? chars / cps : minLine);
+          }
+        } else {
+          const d = safeContentDurationStatic / totalLinesStatic;
+          for (let i = 0; i < totalLinesStatic; i++) lineDurationsStatic[i] = d;
+        }
+
+        let total = lineDurationsStatic.reduce((a, b) => a + b, 0);
+        if (total > 0) {
+          const scale = safeContentDurationStatic / total;
+          for (let i = 0; i < totalLinesStatic; i++) lineDurationsStatic[i] *= scale;
+        }
+
+        let acc = 0;
+        for (let i = 0; i < totalLinesStatic; i++) {
+          lineStartsStatic[i] = acc;
+          acc += lineDurationsStatic[i];
+        }
+      }
       
       const renderFrame = () => {
         if (abortRef.current) { 
@@ -211,83 +287,379 @@ export function useVideoExport() {
         const transitionOpacity = calculateTransitionOpacity(currentTimeSec, timeline.contentDuration, project.ending.enabled);
 
         if (!scrollState.isEnding) {
-          // Draw scrolling text with wave animation and transition
-          ctx.save();
-          ctx.globalAlpha = transitionOpacity.contentOpacity;
-          ctx.fillStyle = project.text.color;
-          ctx.font = `${project.text.isItalic ? 'italic ' : ''}${project.text.isBold ? 'bold ' : ''}${scaledFontSize}px ${project.text.fontFamily}`;
-          ctx.textAlign = project.text.textAlign;
-          
-          // Apply letter spacing if needed
-          if (scaledSettings.letterSpacing !== 0) {
-            ctx.letterSpacing = `${scaledSettings.letterSpacing}px`;
-          }
+          if (project.theme === 'lyrics') {
+            ctx.save();
+            ctx.globalAlpha = transitionOpacity.contentOpacity;
+            ctx.fillStyle = project.text.color;
+            ctx.textAlign = project.text.textAlign;
+            ctx.textBaseline = 'middle';
 
-          const containerWidth = (width * project.text.containerWidth) / 100;
+            // Base layer shadow: subtle, always on
+            ctx.shadowColor = 'rgba(0,0,0,0.55)';
+            ctx.shadowBlur = 18;
+            ctx.shadowOffsetY = 6;
 
-          let textX = width / 2;
-          if (project.text.textAlign === 'left') textX = (width - containerWidth) / 2 + scaledPaddingX;
-          if (project.text.textAlign === 'right') textX = (width + containerWidth) / 2 - scaledPaddingX;
+            const karaokeLrc = karaokeLrcStatic;
+            const stanzaBreaks = stanzaBreaksStatic;
+            const lyricLines = lyricLinesStatic;
+            const totalLines = totalLinesStatic;
+            const lineDurations = lineDurationsStatic;
+            const lineStarts = lineStartsStatic;
 
-          // Use unified scroll calculation - MATCHES PREVIEW EXACTLY
-          const scrollY = calculateScrollPosition(scrollState.progress, height, totalTextHeight);
+            let lineIndex = 0;
+            if (karaokeLrc) {
+              lineIndex = findActiveKaraokeLineIndex(karaokeLrc.lines, currentTimeSec + project.lyrics.lrcOffsetSeconds);
+            } else {
+              const tGlobal = Math.min(Math.max(0, currentTimeSec), safeContentDurationStatic - 0.000001);
+              for (let i = totalLines - 1; i >= 0; i--) {
+                if (tGlobal >= lineStarts[i]) { lineIndex = i; break; }
+              }
+            }
 
-          // Wave animation support
-          if (project.text.waveAnimation) {
-            const totalChars = project.text.content.length;
-            const charsPerSecond = totalChars / timeline.contentDuration;
-            const visibleChars = Math.floor(currentTimeSec * charsPerSecond);
-            
-            let charIndex = 0;
-            lines.forEach((line, i) => {
-              const y = scrollY + scaledPaddingY + i * lineHeight + lineHeight;
-              if (y > -lineHeight && y < height + lineHeight) {
-                // Draw each character with wave opacity
-                const chars = line.split('');
-                let currentX = textX;
-                
-                // Adjust starting X based on alignment
-                if (project.text.textAlign === 'center') {
-                  const lineWidth = ctx.measureText(line).width;
-                  currentX = textX - lineWidth / 2;
-                } else if (project.text.textAlign === 'right') {
-                  const lineWidth = ctx.measureText(line).width;
-                  currentX = textX - lineWidth;
+            const getStanzaBounds = () => {
+              if (project.lyrics.displayMode === 'lines') return { start: lineIndex, end: lineIndex };
+
+              if (project.lyrics.displayMode === 'full') return { start: 0, end: lyricLines.length - 1 };
+
+              if (project.lyrics.timingSource === 'lrc' && stanzaBreaks.length > 0) {
+                let start = 0;
+                for (const b of stanzaBreaks) {
+                  if (b <= lineIndex) start = b;
+                  else break;
                 }
-                
-                chars.forEach((char) => {
-                  const charWidth = ctx.measureText(char).width;
+                let end = lyricLines.length - 1;
+                for (const b of stanzaBreaks) {
+                  if (b > lineIndex) { end = b - 1; break; }
+                }
+                return { start, end };
+              }
+
+              if (project.lyrics.timingSource === 'lrc' && karaokeLrc) {
+                const gapBreakSeconds = 1.25;
+                let start = lineIndex;
+                while (start > 0) {
+                  const prev = karaokeLrc.lines[start - 1];
+                  const curr = karaokeLrc.lines[start];
+                  if (!prev || !curr) break;
+                  const gap = curr.start - prev.end;
+                  if (gap > gapBreakSeconds) break;
+                  start--;
+                }
+
+                let end = lineIndex;
+                while (end < karaokeLrc.lines.length - 1) {
+                  const curr = karaokeLrc.lines[end];
+                  const next = karaokeLrc.lines[end + 1];
+                  if (!curr || !next) break;
+                  const gap = next.start - curr.end;
+                  if (gap > gapBreakSeconds) break;
+                  end++;
+                }
+
+                return { start, end };
+              }
+
+              let start = lineIndex;
+              while (start > 0 && (lyricLines[start - 1] ?? '').trim().length > 0) start--;
+              let end = lineIndex;
+              while (end < lyricLines.length - 1 && (lyricLines[end + 1] ?? '').trim().length > 0) end++;
+              return { start, end };
+            };
+
+            const { start, end } = getStanzaBounds();
+            const stanza = lyricLines.slice(start, end + 1);
+
+            const prev = project.lyrics.displayMode === 'lines' ? (lyricLines[lineIndex - 1] ?? '') : '';
+            const curr = lyricLines[lineIndex] ?? '';
+            const next = project.lyrics.displayMode === 'lines' ? (lyricLines[lineIndex + 1] ?? '') : '';
+
+            const karaokeText = (curr || project.text.content || '').toString();
+
+            const fullFit = project.lyrics.displayMode === 'full'
+              ? Math.max(0.55, Math.min(1, 12 / Math.max(12, stanza.length)))
+              : 1;
+
+            const currFont = Math.round(scaledFontSize * ((project.lyrics.displayMode === 'paragraph' || project.lyrics.displayMode === 'pages') ? 1.15 : (project.lyrics.displayMode === 'full' ? 0.92 * fullFit : 1.25)));
+            const sideFont = Math.round(scaledFontSize * 0.7);
+            const gap = Math.round(currFont * 1.05);
+            const containerWidth = (width * project.text.containerWidth) / 100;
+            let x = width / 2;
+            if (project.text.textAlign === 'left') x = (width - containerWidth) / 2 + scaledPaddingX;
+            if (project.text.textAlign === 'right') x = (width + containerWidth) / 2 - scaledPaddingX;
+
+            const safeHeight = Math.max(0, height - scaledPaddingY * 2);
+            const centerY = scaledPaddingY + safeHeight / 2;
+
+            const activeLineY = (() => {
+              if (project.lyrics.displayMode !== 'paragraph' && project.lyrics.displayMode !== 'pages' && project.lyrics.displayMode !== 'full') return centerY;
+              const count = stanza.length;
+              const baseFont = Math.round(scaledFontSize * (project.lyrics.displayMode === 'full' ? 0.92 * fullFit : 0.9));
+              const lineGap = Math.round(Math.max(0, (scaledSettings.lineHeight - 1) * baseFont));
+              const blockHeight = (count - 1) * lineGap;
+              const topY = centerY - blockHeight / 2;
+              const activeIdx = Math.max(0, Math.min(count - 1, lineIndex - start));
+              return topY + activeIdx * lineGap;
+            })();
+
+            const fontPrefix = `${project.text.isItalic ? 'italic ' : ''}${project.text.isBold ? 'bold ' : ''}`;
+
+            if (project.lyrics.displayMode === 'lines') {
+              // Prev
+              ctx.save();
+              ctx.globalAlpha = transitionOpacity.contentOpacity * 0.35;
+              ctx.font = `${fontPrefix}${sideFont}px ${project.text.fontFamily}`;
+              ctx.fillText(prev, x, centerY - gap);
+              ctx.restore();
+
+              // Current base text (always fully visible)
+              ctx.save();
+              ctx.globalAlpha = transitionOpacity.contentOpacity;
+              ctx.font = `${fontPrefix}${currFont}px ${project.text.fontFamily}`;
+              ctx.fillText(karaokeText, x, centerY);
+              ctx.restore();
+            } else {
+              const count = stanza.length;
+              const baseFont = Math.round(scaledFontSize * (project.lyrics.displayMode === 'full' ? 0.92 * fullFit : 0.9));
+              const lineGap = Math.round(Math.max(0, (scaledSettings.lineHeight - 1) * baseFont));
+              const blockHeight = (count - 1) * lineGap;
+              const topY = centerY - blockHeight / 2;
+
+              for (let i = 0; i < count; i++) {
+                const isActive = start + i === lineIndex;
+                const y = topY + i * lineGap;
+                const activeScale = project.lyrics.displayMode === 'pages' ? 1.2 : project.lyrics.displayMode === 'full' ? 1.15 : 1.15;
+                const font = isActive ? Math.round(baseFont * activeScale) : baseFont;
+                ctx.save();
+                ctx.globalAlpha = transitionOpacity.contentOpacity * (isActive ? 1 : 0.35);
+                ctx.font = `${fontPrefix}${font}px ${project.text.fontFamily}`;
+
+                // Fit long lines into the configured container width by scaling horizontally
+                const text = (stanza[i] ?? '').toString();
+                const measured = ctx.measureText(text).width;
+                const fitX = measured > 0 ? Math.min(1, containerWidth / measured) : 1;
+                ctx.save();
+                ctx.translate(x, y);
+                ctx.scale(fitX, 1);
+                ctx.fillText(text, 0, 0);
+                ctx.restore();
+
+                ctx.restore();
+              }
+            }
+
+            // Karaoke overlay: clipped duplicate layer with stronger/darker glow sweeping left->right
+            if (project.text.waveAnimation) {
+              ctx.save();
+
+              const activeFont = project.lyrics.displayMode === 'lines'
+                ? currFont
+                : (() => {
+                  const baseFont = Math.round(scaledFontSize * (project.lyrics.displayMode === 'full' ? 0.92 * fullFit : 0.9));
+                  const activeScale = project.lyrics.displayMode === 'pages' ? 1.2 : project.lyrics.displayMode === 'full' ? 1.15 : 1.15;
+                  return Math.round(baseFont * activeScale);
+                })();
+
+              ctx.font = `${fontPrefix}${activeFont}px ${project.text.fontFamily}`;
+
+              let fullWidth = 0;
+              let clipWidth = 0;
+
+              if (karaokeLrc) {
+                const line = karaokeLrc.lines[lineIndex];
+                if (line) {
+                  const t = currentTimeSec + project.lyrics.lrcOffsetSeconds + project.lyrics.highlightLeadSeconds;
+                  const { wordIndex, within } = findKaraokeWordProgress(line, t);
+                  const tokens = (line.words.length > 0 ? line.words.map((w) => w.text) : [line.text]).map((s) => s);
+                  const widths = tokens.map((tok) => ctx.measureText(tok).width);
+                  fullWidth = widths.reduce((a, b) => a + b, 0);
+                  const idx = Math.max(0, Math.min(wordIndex, widths.length - 1));
+                  let startX = 0;
+                  for (let i = 0; i < idx; i++) startX += widths[i];
+                  clipWidth = startX + within * widths[idx];
+                }
+              } else {
+                const lineDuration = lineDurations[lineIndex] ?? 0;
+                const lineStartTime = lineStarts[lineIndex] ?? 0;
+                const timeInLine = Math.max(0, Math.min(lineDuration, currentTimeSec - lineStartTime));
+
+                const words = karaokeText.trim().length > 0 ? karaokeText.trim().split(/\s+/).filter(Boolean) : [];
+                const wordCount = Math.max(1, words.length);
+                const wordDuration = lineDuration / wordCount;
+                const lead = Math.max(0, Math.min(wordDuration, project.lyrics.highlightLeadSeconds));
+                const effectiveTime = Math.max(0, Math.min(lineDuration, timeInLine + lead));
+
+                const wordIndex = Math.min(wordCount - 1, Math.floor(effectiveTime / wordDuration));
+                const within = Math.max(0, Math.min(1, (effectiveTime - wordIndex * wordDuration) / wordDuration));
+
+                const spaceWidth = ctx.measureText(' ').width;
+                const widths = words.map((w) => ctx.measureText(w).width);
+                widths.forEach((w, i) => {
+                  fullWidth += w;
+                  if (i < widths.length - 1) fullWidth += spaceWidth;
+                });
+
+                if (words.length > 0) {
+                  let startX = 0;
+                  for (let i = 0; i < wordIndex; i++) startX += widths[i] + spaceWidth;
+                  const endX = startX + widths[wordIndex] + (wordIndex < widths.length - 1 ? spaceWidth : 0);
+                  clipWidth = startX + within * (endX - startX);
+                } else {
+                  clipWidth = 0;
+                }
+              }
+
+              const fitScaleX = fullWidth > 0 ? Math.min(1, containerWidth / fullWidth) : 1;
+              const fullWidthScaled = fullWidth * fitScaleX;
+              const clipWidthScaled = clipWidth * fitScaleX;
+
+              const leftX = project.text.textAlign === 'center'
+                ? x - fullWidthScaled / 2
+                : project.text.textAlign === 'right'
+                  ? x - fullWidthScaled
+                  : x;
+
+              const highlightRgb = (() => {
+                const raw = (project.lyrics.highlightBgColor || '#FFD60A').trim();
+                const hex = raw.startsWith('#') ? raw.slice(1) : raw;
+                const full = hex.length === 3
+                  ? `${hex[0]}${hex[0]}${hex[1]}${hex[1]}${hex[2]}${hex[2]}`
+                  : hex;
+                const r = parseInt(full.slice(0, 2), 16);
+                const g = parseInt(full.slice(2, 4), 16);
+                const b = parseInt(full.slice(4, 6), 16);
+                if (![r, g, b].every(Number.isFinite)) return { r: 255, g: 214, b: 10 };
+                return { r, g, b };
+              })();
+
+              ctx.save();
+              ctx.globalAlpha = transitionOpacity.contentOpacity * project.lyrics.highlightIntensity;
+              ctx.shadowColor = 'rgba(0,0,0,0.85)';
+              ctx.shadowBlur = 26;
+              ctx.shadowOffsetY = 8;
+
+              const y = activeLineY;
+
+              // Colored highlight background behind the revealed portion
+              const bgAlpha = Math.min(1, 0.12 + project.lyrics.highlightIntensity * 0.45);
+              const bgY = y - activeFont * 0.82;
+              const bgH = activeFont * 1.64;
+              const w = Math.max(0, clipWidthScaled);
+              ctx.save();
+              ctx.shadowColor = 'transparent';
+              ctx.shadowBlur = 0;
+              ctx.shadowOffsetY = 0;
+              ctx.fillStyle = `rgba(${highlightRgb.r}, ${highlightRgb.g}, ${highlightRgb.b}, ${bgAlpha})`;
+              if ((ctx as any).roundRect) {
+                ctx.beginPath();
+                (ctx as any).roundRect(leftX, bgY, w, bgH, 12);
+                ctx.fill();
+              } else {
+                ctx.fillRect(leftX, bgY, w, bgH);
+              }
+              ctx.restore();
+
+              ctx.beginPath();
+              ctx.rect(leftX, y - activeFont, Math.max(0, clipWidthScaled), activeFont * 2);
+              ctx.clip();
+
+              ctx.save();
+              ctx.translate(x, y);
+              ctx.scale(fitScaleX, 1);
+              ctx.fillText(karaokeText, 0, 0);
+              ctx.restore();
+              ctx.restore();
+              ctx.restore();
+            }
+
+            if (project.lyrics.displayMode === 'lines') {
+              // Next
+              ctx.save();
+              ctx.globalAlpha = transitionOpacity.contentOpacity * 0.35;
+              ctx.font = `${fontPrefix}${sideFont}px ${project.text.fontFamily}`;
+              ctx.fillText(next, x, centerY + gap);
+              ctx.restore();
+            }
+
+            ctx.restore();
+          } else {
+            // Draw scrolling text with wave animation and transition
+            ctx.save();
+            ctx.globalAlpha = transitionOpacity.contentOpacity;
+            ctx.fillStyle = project.text.color;
+            ctx.font = `${project.text.isItalic ? 'italic ' : ''}${project.text.isBold ? 'bold ' : ''}${scaledFontSize}px ${project.text.fontFamily}`;
+            ctx.textAlign = project.text.textAlign;
+            
+            // Apply letter spacing if needed
+            if (scaledSettings.letterSpacing !== 0) {
+              ctx.letterSpacing = `${scaledSettings.letterSpacing}px`;
+            }
+
+            const containerWidth = (width * project.text.containerWidth) / 100;
+
+            let textX = width / 2;
+            if (project.text.textAlign === 'left') textX = (width - containerWidth) / 2 + scaledPaddingX;
+            if (project.text.textAlign === 'right') textX = (width + containerWidth) / 2 - scaledPaddingX;
+
+            // Use unified scroll calculation - MATCHES PREVIEW EXACTLY
+            const scrollY = calculateScrollPosition(scrollState.progress, height, totalTextHeight);
+
+            // Wave animation support
+            if (project.text.waveAnimation) {
+              const totalChars = project.text.content.length;
+              const charsPerSecond = totalChars / timeline.contentDuration;
+              const visibleChars = Math.floor(currentTimeSec * charsPerSecond);
+              
+              let charIndex = 0;
+              lines.forEach((line, i) => {
+                const y = scrollY + scaledPaddingY + i * lineHeight + lineHeight;
+                if (y > -lineHeight && y < height + lineHeight) {
+                  // Draw each character with wave opacity
+                  const chars = line.split('');
+                  let currentX = textX;
                   
-                  // Calculate wave opacity for this character
-                  let charOpacity = 1;
-                  if (charIndex > visibleChars) {
-                    charOpacity = 0;
-                  } else if (charIndex === visibleChars) {
-                    const charProgress = (currentTimeSec * charsPerSecond) - visibleChars;
-                    charOpacity = charProgress;
+                  // Adjust starting X based on alignment
+                  if (project.text.textAlign === 'center') {
+                    const lineWidth = ctx.measureText(line).width;
+                    currentX = textX - lineWidth / 2;
+                  } else if (project.text.textAlign === 'right') {
+                    const lineWidth = ctx.measureText(line).width;
+                    currentX = textX - lineWidth;
                   }
                   
-                  ctx.save();
-                  ctx.globalAlpha = transitionOpacity.contentOpacity * charOpacity;
-                  ctx.fillText(char, currentX, y);
-                  ctx.restore();
-                  
-                  currentX += charWidth;
-                  charIndex++;
-                });
-                charIndex++; // Account for newline
-              }
-            });
-          } else {
-            // No wave animation - draw normally
-            lines.forEach((line, i) => {
-              const y = scrollY + scaledPaddingY + i * lineHeight + lineHeight;
-              if (y > -lineHeight && y < height + lineHeight) {
-                ctx.fillText(line, textX, y);
-              }
-            });
+                  chars.forEach((char) => {
+                    const charWidth = ctx.measureText(char).width;
+                    
+                    // Calculate wave opacity for this character
+                    let charOpacity = 1;
+                    if (charIndex > visibleChars) {
+                      charOpacity = 0;
+                    } else if (charIndex === visibleChars) {
+                      const charProgress = (currentTimeSec * charsPerSecond) - visibleChars;
+                      charOpacity = charProgress;
+                    }
+                    
+                    ctx.save();
+                    ctx.globalAlpha = transitionOpacity.contentOpacity * charOpacity;
+                    ctx.fillText(char, currentX, y);
+                    ctx.restore();
+                    
+                    currentX += charWidth;
+                    charIndex++;
+                  });
+                  charIndex++; // Account for newline
+                }
+              });
+            } else {
+              // No wave animation - draw normally
+              lines.forEach((line, i) => {
+                const y = scrollY + scaledPaddingY + i * lineHeight + lineHeight;
+                if (y > -lineHeight && y < height + lineHeight) {
+                  ctx.fillText(line, textX, y);
+                }
+              });
+            }
+            ctx.restore();
           }
-          ctx.restore();
         } else {
           // Draw ending card with transition
           ctx.save();

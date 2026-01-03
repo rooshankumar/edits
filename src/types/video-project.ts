@@ -1,4 +1,8 @@
 export type CanvasFormat = 'vertical' | 'horizontal' | 'square' | 'tiktok' | 'youtube-shorts' | 'instagram-post' | 'twitter' | 'facebook-cover';
+export type VideoTheme = 'vertical' | 'lyrics';
+export type LyricsPacingSource = 'wpm' | 'chars';
+export type LyricsTimingSource = 'estimate' | 'lrc';
+export type LyricsDisplayMode = 'lines' | 'paragraph' | 'pages' | 'full';
 export type ScrollDirection = 'up' | 'left' | 'right';
 export type TextAlign = 'left' | 'center' | 'right';
 export type ExportQuality = 'standard' | 'hd' | 'ultra';
@@ -43,6 +47,7 @@ export interface AnimationSettings {
 export interface AudioSettings {
   file: string | null;
   fileName: string | null;
+  duration: number | null;
   volume: number;
   loop: boolean;
 }
@@ -78,9 +83,25 @@ export interface EndingSettings {
   showQR: boolean;
 }
 
+export interface LyricsThemeSettings {
+  timingSource: LyricsTimingSource;
+  karaokeLrc: string;
+  displayMode: LyricsDisplayMode;
+  autoFitLrcToAudio: boolean;
+  lrcOffsetSeconds: number;
+  highlightBgColor: string;
+  pacingSource: LyricsPacingSource;
+  charsPerSecond: number;
+  minLineDuration: number;
+  highlightLeadSeconds: number;
+  highlightIntensity: number;
+}
+
 export interface VideoProject {
   id: string;
   name: string;
+  theme: VideoTheme;
+  lyrics: LyricsThemeSettings;
   canvasFormat: CanvasFormat;
   text: TextSettings;
   background: BackgroundSettings;
@@ -119,14 +140,41 @@ export const FONT_FAMILIES = [
   { name: 'Open Sans', value: 'Open Sans, sans-serif', category: 'readable' },
   { name: 'Roboto', value: 'Roboto, sans-serif', category: 'readable' },
   { name: 'Raleway', value: 'Raleway, sans-serif', category: 'readable' },
+  { name: 'System UI', value: 'system-ui, -apple-system, Segoe UI, Roboto, sans-serif', category: 'readable' },
+  { name: 'Segoe UI', value: 'Segoe UI, system-ui, sans-serif', category: 'readable' },
+  { name: 'Arial', value: 'Arial, Helvetica, sans-serif', category: 'readable' },
+  { name: 'Helvetica', value: 'Helvetica, Arial, sans-serif', category: 'readable' },
+  { name: 'Verdana', value: 'Verdana, Geneva, sans-serif', category: 'readable' },
+  { name: 'Tahoma', value: 'Tahoma, Geneva, sans-serif', category: 'readable' },
+  { name: 'Trebuchet MS', value: 'Trebuchet MS, Arial, sans-serif', category: 'readable' },
   { name: 'Playfair Display', value: 'Playfair Display, serif', category: 'elegant' },
   { name: 'Lora', value: 'Lora, serif', category: 'elegant' },
+  { name: 'Georgia', value: 'Georgia, serif', category: 'elegant' },
+  { name: 'Times New Roman', value: 'Times New Roman, Times, serif', category: 'elegant' },
   { name: 'Oswald', value: 'Oswald, sans-serif', category: 'display' },
+  { name: 'Impact', value: 'Impact, Haettenschweiler, Arial Narrow Bold, sans-serif', category: 'display' },
+  { name: 'Comic Sans', value: 'Comic Sans MS, Comic Sans, cursive', category: 'display' },
   { name: 'Dancing Script', value: 'Dancing Script, cursive', category: 'script' },
+  { name: 'Courier New', value: 'Courier New, Courier, monospace', category: 'mono' },
+  { name: 'Consolas', value: 'Consolas, Monaco, monospace', category: 'mono' },
 ];
 
 export const DEFAULT_PROJECT: Omit<VideoProject, 'id' | 'createdAt' | 'updatedAt'> = {
   name: 'Untitled Project',
+  theme: 'vertical',
+  lyrics: {
+    timingSource: 'estimate',
+    karaokeLrc: '',
+    displayMode: 'lines',
+    autoFitLrcToAudio: true,
+    lrcOffsetSeconds: 0,
+    highlightBgColor: '#FFD60A',
+    pacingSource: 'chars',
+    charsPerSecond: 14,
+    minLineDuration: 1.4,
+    highlightLeadSeconds: 0.08,
+    highlightIntensity: 0.85,
+  },
   canvasFormat: 'vertical',
   text: {
     content: 'Enter your scrolling text here...\n\nAdd multiple lines for a longer scroll effect.\n\nPerfect for social media reels and videos!',
@@ -161,6 +209,7 @@ export const DEFAULT_PROJECT: Omit<VideoProject, 'id' | 'createdAt' | 'updatedAt
   audio: {
     file: null,
     fileName: null,
+    duration: null,
     volume: 80,
     loop: true,
   },

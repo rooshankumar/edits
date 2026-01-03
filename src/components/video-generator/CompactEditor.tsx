@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useMemo, useState, useRef } from 'react';
 import { 
   Type, Palette, Sparkles, Music, ChevronDown, ChevronUp, 
   Bold, Italic, AlignLeft, AlignCenter, AlignRight,
@@ -8,10 +8,13 @@ import {
 import { 
   VideoProject, TextSettings, BackgroundSettings, AnimationSettings, AudioSettings,
   WatermarkSettings, OverlayTextSettings, EndingSettings,
-  FONT_FAMILIES, CANVAS_SIZES, CanvasFormat, WPMPreset, WPM_PRESETS
+  FONT_FAMILIES, CANVAS_SIZES, CanvasFormat, VideoTheme, LyricsPacingSource, LyricsThemeSettings, WPMPreset, WPM_PRESETS,
+  LyricsTimingSource, LyricsDisplayMode
 } from '@/types/video-project';
 import { TimelineState, getWPMLevel } from '@/utils/timeline';
 import { getContentLengthCategory } from '@/utils/textScaling';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Slider } from '@/components/ui/slider';
 import { Switch } from '@/components/ui/switch';
@@ -22,10 +25,13 @@ import { WatermarkControls } from './WatermarkControls';
 import { OverlayControls } from './OverlayControls';
 import { EndingControls } from './EndingControls';
 import { cn } from '@/lib/utils';
+import { parseKaraokeLrc } from '@/utils/karaokeLrc';
 
 interface CompactEditorProps {
   project: VideoProject;
   timeline: TimelineState;
+  onThemeChange: (theme: VideoTheme) => void;
+  onLyricsChange: (updates: Partial<LyricsThemeSettings>) => void;
   onCanvasFormatChange: (format: CanvasFormat) => void;
   onTextChange: (updates: Partial<TextSettings>) => void;
   onBackgroundChange: (updates: Partial<BackgroundSettings>) => void;
@@ -85,6 +91,8 @@ const canvasOptions: { value: CanvasFormat; label: string }[] = [
 export function CompactEditor({
   project,
   timeline,
+  onThemeChange,
+  onLyricsChange,
   onCanvasFormatChange,
   onTextChange,
   onBackgroundChange,
@@ -96,6 +104,31 @@ export function CompactEditor({
 }: CompactEditorProps) {
   const imageInputRef = useRef<HTMLInputElement>(null);
   const videoInputRef = useRef<HTMLInputElement>(null);
+
+  const karaokeMeta = useMemo(() => {
+    if (project.theme !== 'lyrics') return null;
+    if (project.lyrics.timingSource !== 'lrc') return null;
+    if (project.lyrics.karaokeLrc.trim().length === 0) return null;
+    return parseKaraokeLrc(project.lyrics.karaokeLrc);
+  }, [project.lyrics.karaokeLrc, project.lyrics.timingSource, project.theme]);
+
+  const autoFitScale = useMemo(() => {
+    const audioDur = project.audio.duration;
+    const lrcDur = karaokeMeta?.duration;
+    if (!audioDur || !lrcDur || audioDur <= 0 || lrcDur <= 0) return null;
+    return audioDur / lrcDur;
+  }, [karaokeMeta?.duration, project.audio.duration]);
+
+  const effectiveTextContent = useMemo(() => {
+    if (project.theme === 'lyrics' && project.lyrics.timingSource === 'lrc') {
+      return karaokeMeta?.plainText ?? '';
+    }
+    return project.text.content;
+  }, [karaokeMeta?.plainText, project.lyrics.timingSource, project.text.content, project.theme]);
+
+  const effectiveWordCount = useMemo(() => {
+    return (effectiveTextContent || '').split(/\s+/).filter((w) => w.length > 0).length;
+  }, [effectiveTextContent]);
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -149,20 +182,262 @@ export function CompactEditor({
           </p>
         </div>
 
+        <div className="p-3 bg-card border-b border-border">
+          <label className="text-xs font-semibold text-foreground mb-2 block">Video Theme</label>
+          <div className="grid grid-cols-2 gap-1.5">
+            <button
+              onClick={() => onThemeChange('vertical')}
+              className={cn(
+                'px-2 py-1.5 text-[10px] font-medium transition-all border excel-hover',
+                project.theme === 'vertical'
+                  ? 'bg-excel-selected border-primary border-2'
+                  : 'bg-card border-border'
+              )}
+            >
+              Vertical
+            </button>
+            <button
+              onClick={() => onThemeChange('lyrics')}
+              className={cn(
+                'px-2 py-1.5 text-[10px] font-medium transition-all border excel-hover',
+                project.theme === 'lyrics'
+                  ? 'bg-excel-selected border-primary border-2'
+                  : 'bg-card border-border'
+              )}
+            >
+              Lyrics
+            </button>
+          </div>
+        </div>
+
+        {project.theme === 'lyrics' && (
+          <div className="p-3 bg-card border-b border-border space-y-3">
+            <div>
+              <label className="text-[10px] font-medium text-muted-foreground mb-1 block">Timing Source</label>
+              <Select
+                value={project.lyrics.timingSource}
+                onValueChange={(v) => onLyricsChange({ timingSource: v as LyricsTimingSource })}
+              >
+                <SelectTrigger className="h-7 text-[10px] border-border">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="border-border">
+                  <SelectItem value="estimate" className="text-xs">Estimate (chars/sec)</SelectItem>
+                  <SelectItem value="lrc" className="text-xs">Karaoke LRC (word-timed)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {project.lyrics.timingSource === 'lrc' && (
+              <>
+                <div>
+                  <label className="text-[10px] font-medium text-muted-foreground mb-1 block">Display Mode</label>
+                  <Select
+                    value={project.lyrics.displayMode}
+                    onValueChange={(v) => onLyricsChange({ displayMode: v as LyricsDisplayMode })}
+                  >
+                    <SelectTrigger className="h-7 text-[10px] border-border">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="border-border">
+                      <SelectItem value="lines" className="text-xs">Lines (prev/current/next)</SelectItem>
+                      <SelectItem value="paragraph" className="text-xs">Paragraph</SelectItem>
+                      <SelectItem value="pages" className="text-xs">Pages (one paragraph at a time)</SelectItem>
+                      <SelectItem value="full" className="text-xs">Full (show all text)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div>
+                  <label className="text-[10px] font-medium text-muted-foreground mb-1 block">Karaoke LRC</label>
+                  <Textarea
+                    value={project.lyrics.karaokeLrc}
+                    onChange={(e) => onLyricsChange({ karaokeLrc: e.target.value })}
+                    placeholder="Paste your word-timed LRC here..."
+                    className="min-h-[100px] resize-none border-border text-xs"
+                  />
+                  <p className="text-[9px] text-muted-foreground mt-1">
+                    Tip: add a blank line between timestamped lines to separate paragraphs/pages.
+                  </p>
+                </div>
+
+                <div className="flex items-center justify-between px-3 py-2 border border-border excel-hover">
+                  <div>
+                    <p className="text-[10px] font-medium">Auto-fit LRC to audio</p>
+                    <p className="text-[9px] text-muted-foreground">Scales all timestamps to match audio duration</p>
+                  </div>
+                  <Switch
+                    checked={project.lyrics.autoFitLrcToAudio}
+                    onCheckedChange={(checked) => onLyricsChange({ autoFitLrcToAudio: checked })}
+                  />
+                </div>
+
+                <div className="flex items-center justify-between px-3 py-2 border border-border excel-hover">
+                  <div>
+                    <p className="text-[10px] font-medium">Highlight BG Color</p>
+                    <p className="text-[9px] text-muted-foreground">Background behind the highlighted words</p>
+                  </div>
+                  <Input
+                    type="color"
+                    value={project.lyrics.highlightBgColor}
+                    onChange={(e) => onLyricsChange({ highlightBgColor: e.target.value })}
+                    className="h-7 w-10 p-0 border-border"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-[10px] font-medium text-muted-foreground mb-1 block">
+                    LRC offset: {project.lyrics.lrcOffsetSeconds.toFixed(2)}s
+                  </label>
+                  <Slider
+                    value={[project.lyrics.lrcOffsetSeconds]}
+                    onValueChange={([v]) => onLyricsChange({ lrcOffsetSeconds: v })}
+                    min={-2}
+                    max={2}
+                    step={0.01}
+                  />
+                  <p className="text-[9px] text-muted-foreground mt-1">
+                    Positive = highlight later. Negative = highlight earlier.
+                  </p>
+                </div>
+
+                <div>
+                  <label className="text-[10px] font-medium text-muted-foreground mb-1 block">
+                    Highlight lead: {project.lyrics.highlightLeadSeconds.toFixed(2)}s
+                  </label>
+                  <Slider
+                    value={[project.lyrics.highlightLeadSeconds]}
+                    onValueChange={([v]) => onLyricsChange({ highlightLeadSeconds: v })}
+                    min={-0.3}
+                    max={0.3}
+                    step={0.01}
+                  />
+                  <p className="text-[9px] text-muted-foreground mt-1">
+                    Use this for small sync tweaks (usually 0.00–0.10s).
+                  </p>
+                </div>
+
+                {project.lyrics.autoFitLrcToAudio && (
+                  <div className="text-[9px] text-muted-foreground">
+                    {project.audio.file ? (
+                      autoFitScale ? (
+                        <div className={cn(Math.abs(autoFitScale - 1) > 0.05 && 'text-yellow-600 dark:text-yellow-400')}>
+                          Audio: {project.audio.duration?.toFixed(2)}s, LRC: {karaokeMeta?.duration.toFixed(2)}s, scale: {autoFitScale.toFixed(3)}x
+                        </div>
+                      ) : (
+                        <div>
+                          Add an audio file (or wait for duration to load) to compute scaling.
+                        </div>
+                      )
+                    ) : (
+                      <div>Add an audio file to auto-fit LRC timing.</div>
+                    )}
+                  </div>
+                )}
+              </>
+            )}
+
+            {project.lyrics.timingSource === 'estimate' && (
+              <div>
+                <label className="text-[10px] font-medium text-muted-foreground mb-1 block">Lyrics Pacing</label>
+                <Select
+                  value={project.lyrics.pacingSource}
+                  onValueChange={(v) => onLyricsChange({ pacingSource: v as LyricsPacingSource })}
+                >
+                  <SelectTrigger className="h-7 text-[10px] border-border">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="border-border">
+                    <SelectItem value="chars" className="text-xs">Characters/sec (recommended)</SelectItem>
+                    <SelectItem value="wpm" className="text-xs">Use WPM/Duration</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
+            {project.lyrics.timingSource === 'estimate' && project.lyrics.pacingSource === 'chars' && (
+              <>
+                <div>
+                  <label className="text-[10px] font-medium text-muted-foreground mb-1 block">
+                    Chars/sec: {project.lyrics.charsPerSecond}
+                  </label>
+                  <Slider
+                    value={[project.lyrics.charsPerSecond]}
+                    onValueChange={([v]) => onLyricsChange({ charsPerSecond: v })}
+                    min={5}
+                    max={30}
+                    step={1}
+                  />
+                </div>
+
+                <div>
+                  <label className="text-[10px] font-medium text-muted-foreground mb-1 block">
+                    Min seconds/line: {project.lyrics.minLineDuration.toFixed(1)}s
+                  </label>
+                  <Slider
+                    value={[project.lyrics.minLineDuration]}
+                    onValueChange={([v]) => onLyricsChange({ minLineDuration: v })}
+                    min={0.5}
+                    max={4}
+                    step={0.1}
+                  />
+                </div>
+              </>
+            )}
+
+            <div className={cn(
+              'grid gap-2',
+              project.lyrics.timingSource === 'estimate' ? 'grid-cols-2' : 'grid-cols-1'
+            )}>
+              {project.lyrics.timingSource === 'estimate' && (
+                <div>
+                  <label className="text-[10px] font-medium text-muted-foreground mb-1 block">
+                    Highlight lead: {project.lyrics.highlightLeadSeconds.toFixed(2)}s
+                  </label>
+                  <Slider
+                    value={[project.lyrics.highlightLeadSeconds]}
+                    onValueChange={([v]) => onLyricsChange({ highlightLeadSeconds: v })}
+                    min={0}
+                    max={0.25}
+                    step={0.01}
+                  />
+                </div>
+              )}
+              <div>
+                <label className="text-[10px] font-medium text-muted-foreground mb-1 block">
+                  Highlight intensity: {project.lyrics.highlightIntensity.toFixed(2)}
+                </label>
+                <Slider
+                  value={[project.lyrics.highlightIntensity]}
+                  onValueChange={([v]) => onLyricsChange({ highlightIntensity: v })}
+                  min={0.2}
+                  max={1}
+                  step={0.05}
+                />
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* TEXT Section */}
         <Section title="Text" icon={<Type className="w-3 h-3" />}>
           <div>
             <label className="text-[10px] font-medium text-muted-foreground mb-1 block">Content</label>
             <Textarea
-              value={project.text.content}
-              onChange={(e) => onTextChange({ content: e.target.value })}
+              value={effectiveTextContent}
+              onChange={(e) => {
+                if (!(project.theme === 'lyrics' && project.lyrics.timingSource === 'lrc')) {
+                  onTextChange({ content: e.target.value });
+                }
+              }}
+              readOnly={project.theme === 'lyrics' && project.lyrics.timingSource === 'lrc'}
               placeholder="Enter your scrolling text..."
               className="min-h-[80px] resize-none border-border text-xs"
             />
             <div className="flex items-center justify-between mt-1">
               <div className="flex items-center gap-1">
                 {(() => {
-                  const lengthInfo = getContentLengthCategory(timeline.wordCount);
+                  const lengthInfo = getContentLengthCategory(effectiveWordCount);
                   return (
                     <>
                       <span className={cn(
@@ -180,7 +455,7 @@ export function CompactEditor({
                 })()}
               </div>
               <p className="text-[10px] text-muted-foreground">
-                {timeline.wordCount} words
+                {effectiveWordCount} words
               </p>
             </div>
           </div>

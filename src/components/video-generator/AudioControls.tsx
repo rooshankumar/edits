@@ -18,17 +18,27 @@ export function AudioControls({ settings, onChange }: AudioControlsProps) {
     if (file) {
       const reader = new FileReader();
       reader.onload = (event) => {
-        onChange({ 
-          file: event.target?.result as string,
-          fileName: file.name 
+        const src = event.target?.result as string;
+        onChange({
+          file: src,
+          fileName: file.name,
+          duration: null,
         });
+
+        const el = document.createElement('audio');
+        el.preload = 'metadata';
+        el.onloadedmetadata = () => {
+          const d = Number.isFinite(el.duration) ? el.duration : null;
+          onChange({ duration: d && d > 0 ? d : null });
+        };
+        el.src = src;
       };
       reader.readAsDataURL(file);
     }
   };
 
   const handleRemove = () => {
-    onChange({ file: null, fileName: null });
+    onChange({ file: null, fileName: null, duration: null });
   };
 
   return (
