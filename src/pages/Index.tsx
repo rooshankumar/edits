@@ -31,13 +31,26 @@ export default function Index() {
   const wasPlayingRef = useRef(false);
 
   // Use unified timeline engine - SINGLE SOURCE OF TRUTH
-  const timeline = computeTimeline(
+  const baseTimeline = computeTimeline(
     project.text.content,
     project.animation.wpmPreset,
     project.animation.wpmPreset === 'custom' ? project.animation.duration : null,
     project.ending.enabled,
     project.ending.duration
   );
+
+  // For lyrics theme with LRC + autoFitLrcToAudio: audio duration is authoritative
+  const timeline = (
+    project.theme === 'lyrics' &&
+    project.lyrics.timingSource === 'lrc' &&
+    project.lyrics.autoFitLrcToAudio &&
+    project.audio.duration &&
+    project.audio.duration > 0
+  ) ? {
+    ...baseTimeline,
+    contentDuration: project.audio.duration,
+    totalDuration: project.audio.duration + (baseTimeline.endingDuration),
+  } : baseTimeline;
 
   const useAudioClock = !!project.audio.file;
 
