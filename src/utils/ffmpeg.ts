@@ -143,11 +143,24 @@ export async function encodeVideoWithFFmpeg(
 
     // Read the output file
     const data = await ffmpeg.readFile(outputFile);
-    const blob = new Blob([data], { 
-      type: options.format === 'mp4' ? 'video/mp4' : 
-            options.format === 'webm' ? 'video/webm' : 
-            'image/gif' 
-    });
+    // Create blob from the data - handle both string and Uint8Array
+    let blob: Blob;
+    if (typeof data === 'string') {
+      blob = new Blob([data], { 
+        type: options.format === 'mp4' ? 'video/mp4' : 
+              options.format === 'webm' ? 'video/webm' : 
+              'image/gif' 
+      });
+    } else {
+      // Create a copy to avoid SharedArrayBuffer issues
+      const copy = new Uint8Array(data.length);
+      copy.set(data);
+      blob = new Blob([copy], { 
+        type: options.format === 'mp4' ? 'video/mp4' : 
+              options.format === 'webm' ? 'video/webm' : 
+              'image/gif' 
+      });
+    }
 
     // Cleanup
     for (let i = 0; i < frames.length; i++) {
