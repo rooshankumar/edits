@@ -2,7 +2,7 @@ import { useState, useCallback, useRef } from 'react';
 import { VideoProject, CANVAS_SIZES, ExportQuality, ExportFormat } from '@/types/video-project';
 import { computeTimeline, computeScrollState, calculateScrollPosition, calculateRelativeFontSize, calculateTransitionOpacity } from '@/utils/timeline';
 import { getScaledTextSettings } from '@/utils/textScaling';
-import { parseKaraokeLrc, findActiveKaraokeLineIndex, findKaraokeWordProgress, scaleKaraokeLrc, detectKaraokeStanzaBreaks } from '@/utils/karaokeLrc';
+import { parseKaraokeLrc, findActiveKaraokeLineIndex, findKaraokeWordProgress, scaleKaraokeLrc, detectKaraokeStanzaBreaks, getKaraokePageInfo, getEstimatedWordProgress } from '@/utils/karaokeLrc';
 
 interface ExportState {
   isExporting: boolean;
@@ -328,18 +328,18 @@ export function useVideoExport() {
             ctx.textAlign = project.text.textAlign;
             ctx.textBaseline = 'middle';
 
-            // Base layer shadow: subtle, always on
+            // Base layer shadow
             ctx.shadowColor = 'rgba(0,0,0,0.55)';
             ctx.shadowBlur = 18;
             ctx.shadowOffsetY = 6;
 
             const karaokeLrc = karaokeLrcStatic;
-            const stanzaBreaks = stanzaBreaksStatic;
             const lyricLines = lyricLinesStatic;
             const totalLines = totalLinesStatic;
             const lineDurations = lineDurationsStatic;
             const lineStarts = lineStartsStatic;
 
+            // Get active line index
             let lineIndex = 0;
             if (karaokeLrc) {
               lineIndex = findActiveKaraokeLineIndex(karaokeLrc.lines, currentTimeSec + project.lyrics.lrcOffsetSeconds);
@@ -350,72 +350,47 @@ export function useVideoExport() {
               }
             }
 
-            const getStanzaBounds = () => {
-              if (project.lyrics.displayMode === 'lines') return { start: lineIndex, end: lineIndex };
+            // Get page info for pages mode
+            const pageInfo = getKaraokePageInfo(totalLines, lineIndex, project.lyrics.linesPerPage);
 
-              if (project.lyrics.displayMode === 'full') return { start: 0, end: lyricLines.length - 1 };
-
-              if (project.lyrics.timingSource === 'lrc' && stanzaBreaks.length > 0) {
-                let start = 0;
-                for (const b of stanzaBreaks) {
-                  if (b <= lineIndex) start = b;
-                  else break;
-                }
-                let end = lyricLines.length - 1;
-                for (const b of stanzaBreaks) {
-                  if (b > lineIndex) { end = b - 1; break; }
-                }
-                return { start, end };
+            // Get word progress for highlighting
+            let wordProgress = { wordIndex: 0, within: 0, highlightedWords: [] as number[] };
+            if (karaokeLrc) {
+              const line = karaokeLrc.lines[lineIndex];
+              if (line) {
+                const t = currentTimeSec + project.lyrics.lrcOffsetSeconds + project.lyrics.highlightLeadSeconds;
+                const { wordIndex, within } = findKaraokeWordProgress(line, t);
+                const highlightedWords: number[] = [];
+                for (let i = 0; i <= wordIndex; i++) highlightedWords.push(i);
+                wordProgress = { wordIndex, within, highlightedWords };
               }
+            } else {
+              const lineStartTime = lineStarts[lineIndex] ?? 0;
+              const lineDuration = lineDurations[lineIndex] ?? 0;
+              const timeInLine = Math.max(0, currentTimeSec - lineStartTime);
+              const lineText = lyricLines[lineIndex] ?? '';
+              wordProgress = getEstimatedWordProgress(lineText, lineDuration, timeInLine, project.lyrics.highlightLeadSeconds);
+            }
 
-              if (project.lyrics.timingSource === 'lrc' && karaokeLrc) {
-                const gapBreakSeconds = 1.25;
-                let start = lineIndex;
-                while (start > 0) {
-                  const prev = karaokeLrc.lines[start - 1];
-                  const curr = karaokeLrc.lines[start];
-                  if (!prev || !curr) break;
-                  const gap = curr.start - prev.end;
-                  if (gap > gapBreakSeconds) break;
-                  start--;
-                }
-
-                let end = lineIndex;
-                while (end < karaokeLrc.lines.length - 1) {
-                  const curr = karaokeLrc.lines[end];
-                  const next = karaokeLrc.lines[end + 1];
-                  if (!curr || !next) break;
-                  const gap = next.start - curr.end;
-                  if (gap > gapBreakSeconds) break;
-                  end++;
-                }
-
-                return { start, end };
+            // Determine which lines to display based on mode
+            let displayLines: { text: string; originalIndex: number }[] = [];
+            
+            if (project.lyrics.displayMode === 'pages') {
+              for (let i = pageInfo.pageStart; i <= pageInfo.pageEnd; i++) {
+                displayLines.push({ text: lyricLines[i] ?? '', originalIndex: i });
               }
+            } else if (project.lyrics.displayMode === 'full') {
+              displayLines = lyricLines.map((line, i) => ({ text: line, originalIndex: i }));
+            } else {
+              // Lines mode
+              displayLines = [
+                { text: lyricLines[lineIndex - 1] ?? '', originalIndex: lineIndex - 1 },
+                { text: lyricLines[lineIndex] ?? '', originalIndex: lineIndex },
+                { text: lyricLines[lineIndex + 1] ?? '', originalIndex: lineIndex + 1 },
+              ];
+            }
 
-              let start = lineIndex;
-              while (start > 0 && (lyricLines[start - 1] ?? '').trim().length > 0) start--;
-              let end = lineIndex;
-              while (end < lyricLines.length - 1 && (lyricLines[end + 1] ?? '').trim().length > 0) end++;
-              return { start, end };
-            };
-
-            const { start, end } = getStanzaBounds();
-            const stanza = lyricLines.slice(start, end + 1);
-
-            const prev = project.lyrics.displayMode === 'lines' ? (lyricLines[lineIndex - 1] ?? '') : '';
-            const curr = lyricLines[lineIndex] ?? '';
-            const next = project.lyrics.displayMode === 'lines' ? (lyricLines[lineIndex + 1] ?? '') : '';
-
-            const karaokeText = (curr || project.text.content || '').toString();
-
-            const fullFit = project.lyrics.displayMode === 'full'
-              ? Math.max(0.55, Math.min(1, 12 / Math.max(12, stanza.length)))
-              : 1;
-
-            const currFont = Math.round(scaledFontSize * ((project.lyrics.displayMode === 'paragraph' || project.lyrics.displayMode === 'pages') ? 1.15 : (project.lyrics.displayMode === 'full' ? 0.92 * fullFit : 1.25)));
-            const sideFont = Math.round(scaledFontSize * 0.7);
-            const gap = Math.round(currFont * 1.05);
+            const fontPrefix = `${project.text.isItalic ? 'italic ' : ''}${project.text.isBold ? 'bold ' : ''}`;
             const containerWidth = (width * project.text.containerWidth) / 100;
             let x = width / 2;
             if (project.text.textAlign === 'left') x = (width - containerWidth) / 2 + scaledPaddingX;
@@ -424,222 +399,190 @@ export function useVideoExport() {
             const safeHeight = Math.max(0, height - scaledPaddingY * 2);
             const centerY = scaledPaddingY + safeHeight / 2;
 
-            const activeLineY = (() => {
-              if (project.lyrics.displayMode !== 'paragraph' && project.lyrics.displayMode !== 'pages' && project.lyrics.displayMode !== 'full') return centerY;
-              const count = stanza.length;
-              const baseFont = Math.round(scaledFontSize * (project.lyrics.displayMode === 'full' ? 0.92 * fullFit : 0.9));
-              const lineGap = Math.round(Math.max(0, (scaledSettings.lineHeight - 1) * baseFont));
-              const blockHeight = (count - 1) * lineGap;
-              const topY = centerY - blockHeight / 2;
-              const activeIdx = Math.max(0, Math.min(count - 1, lineIndex - start));
-              return topY + activeIdx * lineGap;
+            // Parse highlight color
+            const highlightRgb = (() => {
+              const raw = (project.lyrics.highlightBgColor || '#FFD60A').trim();
+              const hex = raw.startsWith('#') ? raw.slice(1) : raw;
+              const full = hex.length === 3
+                ? `${hex[0]}${hex[0]}${hex[1]}${hex[1]}${hex[2]}${hex[2]}`
+                : hex;
+              const r = parseInt(full.slice(0, 2), 16);
+              const g = parseInt(full.slice(2, 4), 16);
+              const b = parseInt(full.slice(4, 6), 16);
+              if (![r, g, b].every(Number.isFinite)) return { r: 255, g: 214, b: 10 };
+              return { r, g, b };
             })();
 
-            const fontPrefix = `${project.text.isItalic ? 'italic ' : ''}${project.text.isBold ? 'bold ' : ''}`;
+            const highlightBgOpacity = Math.min(1, 0.12 + project.lyrics.highlightIntensity * 0.45);
 
-            const wrapText = (text: string, maxWidth: number): string[] => {
-              const raw = (text ?? '').toString();
-              if (raw.trim().length === 0) return [''];
-
-              const words = raw.split(/\s+/).filter(Boolean);
-              if (words.length === 0) return [''];
-
-              const lines: string[] = [];
-              let current = words[0];
-
-              for (let i = 1; i < words.length; i++) {
-                const candidate = `${current} ${words[i]}`;
-                if (ctx.measureText(candidate).width <= maxWidth) {
-                  current = candidate;
-                } else {
-                  lines.push(current);
-                  current = words[i];
-                }
-              }
-
-              lines.push(current);
-              return lines.length > 0 ? lines : [''];
-            };
+            // Calculate font sizes
+            const baseFontSize = scaledFontSize * 0.9;
+            const activeFontSize = baseFontSize * 1.2;
+            const sideFont = scaledFontSize * 0.7;
 
             if (project.lyrics.displayMode === 'lines') {
-              // Prev
-              ctx.save();
-              ctx.globalAlpha = transitionOpacity.contentOpacity * 0.35;
-              ctx.font = `${fontPrefix}${sideFont}px ${project.text.fontFamily}`;
-              ctx.fillText(prev, x, centerY - gap);
-              ctx.restore();
+              // Lines mode: prev / current / next
+              const gap = Math.round(activeFontSize * 1.05);
+              
+              // Prev line
+              if (displayLines[0]?.text) {
+                ctx.save();
+                ctx.globalAlpha = transitionOpacity.contentOpacity * 0.35;
+                ctx.font = `${fontPrefix}${sideFont}px ${project.text.fontFamily}`;
+                ctx.fillText(displayLines[0].text, x, centerY - gap);
+                ctx.restore();
+              }
 
-              // Current base text (always fully visible)
+              // Current line - base text
+              const currText = displayLines[1]?.text || '';
               ctx.save();
               ctx.globalAlpha = transitionOpacity.contentOpacity;
-              ctx.font = `${fontPrefix}${currFont}px ${project.text.fontFamily}`;
-              ctx.fillText(karaokeText, x, centerY);
+              ctx.font = `${fontPrefix}${activeFontSize * 1.04}px ${project.text.fontFamily}`;
+              ctx.fillText(currText, x, centerY);
               ctx.restore();
-            } else {
-              const count = stanza.length;
-              const baseFont = Math.round(scaledFontSize * (project.lyrics.displayMode === 'full' ? 0.92 * fullFit : 0.9));
-              const activeScale = project.lyrics.displayMode === 'pages' ? 1.2 : project.lyrics.displayMode === 'full' ? 1.15 : 1.15;
 
-              // Wrap each original stanza line into multiple canvas lines, matching DOM wrapping expectation.
-              // We compute wrapped block height and center it like preview.
-              const wrapped = stanza.map((raw, i) => {
-                const isActive = start + i === lineIndex;
-                const font = isActive ? Math.round(baseFont * activeScale) : baseFont;
-                ctx.font = `${fontPrefix}${font}px ${project.text.fontFamily}`;
-                const wrappedLines = wrapText((raw ?? '').toString(), containerWidth);
-                return { stanzaIndex: i, isActive, font, wrappedLines };
-              });
+              // Render word-level highlight for current line
+              if (project.text.waveAnimation && currText.trim().length > 0) {
+                ctx.save();
+                const words = karaokeLrc?.lines[lineIndex]?.words.length 
+                  ? karaokeLrc.lines[lineIndex].words.map(w => w.text)
+                  : currText.trim().split(/\s+/).filter(Boolean);
 
-              // Approx line height for canvas wrapping
-              const lineHeightPx = Math.max(1, baseFont * scaledSettings.lineHeight);
-              const totalWrappedLines = wrapped.reduce((acc, item) => acc + item.wrappedLines.length, 0);
-              const blockHeight = Math.max(0, (totalWrappedLines - 1) * lineHeightPx);
-              const topY = centerY - blockHeight / 2;
-
-              let lineCursor = 0;
-              for (const item of wrapped) {
-                for (const l of item.wrappedLines) {
-                  const y = topY + lineCursor * lineHeightPx;
-                  ctx.save();
-                  ctx.globalAlpha = transitionOpacity.contentOpacity * (item.isActive ? 1 : 0.35);
-                  ctx.font = `${fontPrefix}${item.font}px ${project.text.fontFamily}`;
-                  ctx.fillText(l, x, y);
-                  ctx.restore();
-                  lineCursor++;
+                const wordWidths = words.map(w => ctx.measureText(w).width);
+                const spaceWidth = ctx.measureText(' ').width;
+                let totalWidth = wordWidths.reduce((a, b) => a + b, 0) + spaceWidth * (words.length - 1);
+                
+                // Calculate clip width
+                let clipWidth = 0;
+                for (let i = 0; i < wordProgress.wordIndex; i++) {
+                  clipWidth += wordWidths[i] + spaceWidth;
                 }
+                clipWidth += wordProgress.within * wordWidths[wordProgress.wordIndex];
+
+                const leftX = project.text.textAlign === 'center'
+                  ? x - totalWidth / 2
+                  : project.text.textAlign === 'right'
+                    ? x - totalWidth
+                    : x;
+
+                // Draw highlight background
+                const bgY = centerY - activeFontSize * 0.5;
+                const bgH = activeFontSize * 1.2;
+                ctx.save();
+                ctx.shadowColor = 'transparent';
+                ctx.shadowBlur = 0;
+                ctx.fillStyle = `rgba(${highlightRgb.r}, ${highlightRgb.g}, ${highlightRgb.b}, ${highlightBgOpacity})`;
+                if ((ctx as any).roundRect) {
+                  ctx.beginPath();
+                  (ctx as any).roundRect(leftX, bgY, clipWidth, bgH, 8);
+                  ctx.fill();
+                } else {
+                  ctx.fillRect(leftX, bgY, clipWidth, bgH);
+                }
+                ctx.restore();
+                ctx.restore();
               }
+
+              // Next line
+              if (displayLines[2]?.text) {
+                ctx.save();
+                ctx.globalAlpha = transitionOpacity.contentOpacity * 0.35;
+                ctx.font = `${fontPrefix}${sideFont}px ${project.text.fontFamily}`;
+                ctx.fillText(displayLines[2].text, x, centerY + gap);
+                ctx.restore();
+              }
+            } else {
+              // Pages or Full mode
+              const lineGap = Math.round(baseFontSize * scaledSettings.lineHeight);
+              const totalBlockHeight = (displayLines.length - 1) * lineGap;
+              const topY = centerY - totalBlockHeight / 2;
+
+              displayLines.forEach((line, i) => {
+                const isActive = line.originalIndex === lineIndex;
+                const fontSize = isActive ? activeFontSize : baseFontSize;
+                const y = topY + i * lineGap;
+
+                ctx.save();
+                ctx.globalAlpha = transitionOpacity.contentOpacity * (isActive ? 1 : 0.35);
+                ctx.font = `${fontPrefix}${fontSize}px ${project.text.fontFamily}`;
+                ctx.fillText(line.text, x, y);
+                ctx.restore();
+
+                // Draw highlight for active line
+                if (isActive && project.text.waveAnimation && line.text.trim().length > 0) {
+                  ctx.save();
+                  ctx.font = `${fontPrefix}${fontSize}px ${project.text.fontFamily}`;
+                  
+                  const words = karaokeLrc?.lines[lineIndex]?.words.length 
+                    ? karaokeLrc.lines[lineIndex].words.map(w => w.text)
+                    : line.text.trim().split(/\s+/).filter(Boolean);
+
+                  const wordWidths = words.map(w => ctx.measureText(w).width);
+                  const spaceWidth = ctx.measureText(' ').width;
+                  let totalWidth = wordWidths.reduce((a, b) => a + b, 0) + spaceWidth * (words.length - 1);
+                  
+                  let clipWidth = 0;
+                  for (let j = 0; j < wordProgress.wordIndex; j++) {
+                    clipWidth += wordWidths[j] + spaceWidth;
+                  }
+                  clipWidth += wordProgress.within * (wordWidths[wordProgress.wordIndex] || 0);
+
+                  const leftX = project.text.textAlign === 'center'
+                    ? x - totalWidth / 2
+                    : project.text.textAlign === 'right'
+                      ? x - totalWidth
+                      : x;
+
+                  // Draw highlight background
+                  const bgY = y - fontSize * 0.5;
+                  const bgH = fontSize * 1.2;
+                  ctx.save();
+                  ctx.shadowColor = 'transparent';
+                  ctx.shadowBlur = 0;
+                  ctx.fillStyle = `rgba(${highlightRgb.r}, ${highlightRgb.g}, ${highlightRgb.b}, ${highlightBgOpacity})`;
+                  if ((ctx as any).roundRect) {
+                    ctx.beginPath();
+                    (ctx as any).roundRect(leftX, bgY, clipWidth, bgH, 8);
+                    ctx.fill();
+                  } else {
+                    ctx.fillRect(leftX, bgY, clipWidth, bgH);
+                  }
+                  ctx.restore();
+                  ctx.restore();
+                }
+              });
             }
 
-            // Karaoke overlay: clipped duplicate layer with stronger/darker glow sweeping left->right
-            if (project.text.waveAnimation) {
+            // Draw progress bar if enabled
+            if (project.lyrics.showProgressBar) {
+              const progress = Math.min(1, Math.max(0, currentTimeSec / safeContentDurationStatic));
+              const barWidth = width * 0.5;
+              const barHeight = 4;
+              const barX = (width - barWidth) / 2;
+              const barY = height - scaledPaddingY - barHeight;
+
+              // Background
               ctx.save();
-
-              const activeFont = project.lyrics.displayMode === 'lines'
-                ? currFont
-                : (() => {
-                  const baseFont = Math.round(scaledFontSize * (project.lyrics.displayMode === 'full' ? 0.92 * fullFit : 0.9));
-                  const activeScale = project.lyrics.displayMode === 'pages' ? 1.2 : project.lyrics.displayMode === 'full' ? 1.15 : 1.15;
-                  return Math.round(baseFont * activeScale);
-                })();
-
-              ctx.font = `${fontPrefix}${activeFont}px ${project.text.fontFamily}`;
-
-              let fullWidth = 0;
-              let clipWidth = 0;
-
-              if (karaokeLrc) {
-                const line = karaokeLrc.lines[lineIndex];
-                if (line) {
-                  const t = currentTimeSec + project.lyrics.lrcOffsetSeconds + project.lyrics.highlightLeadSeconds;
-                  const { wordIndex, within } = findKaraokeWordProgress(line, t);
-                  const tokens = (line.words.length > 0 ? line.words.map((w) => w.text) : [line.text]).map((s) => s);
-                  const widths = tokens.map((tok) => ctx.measureText(tok).width);
-                  fullWidth = widths.reduce((a, b) => a + b, 0);
-                  const idx = Math.max(0, Math.min(wordIndex, widths.length - 1));
-                  let startX = 0;
-                  for (let i = 0; i < idx; i++) startX += widths[i];
-                  clipWidth = startX + within * widths[idx];
-                }
-              } else {
-                const lineDuration = lineDurations[lineIndex] ?? 0;
-                const lineStartTime = lineStarts[lineIndex] ?? 0;
-                const timeInLine = Math.max(0, Math.min(lineDuration, currentTimeSec - lineStartTime));
-
-                const words = karaokeText.trim().length > 0 ? karaokeText.trim().split(/\s+/).filter(Boolean) : [];
-                const wordCount = Math.max(1, words.length);
-                const wordDuration = lineDuration / wordCount;
-                const lead = Math.max(0, Math.min(wordDuration, project.lyrics.highlightLeadSeconds));
-                const effectiveTime = Math.max(0, Math.min(lineDuration, timeInLine + lead));
-
-                const wordIndex = Math.min(wordCount - 1, Math.floor(effectiveTime / wordDuration));
-                const within = Math.max(0, Math.min(1, (effectiveTime - wordIndex * wordDuration) / wordDuration));
-
-                const spaceWidth = ctx.measureText(' ').width;
-                const widths = words.map((w) => ctx.measureText(w).width);
-                widths.forEach((w, i) => {
-                  fullWidth += w;
-                  if (i < widths.length - 1) fullWidth += spaceWidth;
-                });
-
-                if (words.length > 0) {
-                  let startX = 0;
-                  for (let i = 0; i < wordIndex; i++) startX += widths[i] + spaceWidth;
-                  const endX = startX + widths[wordIndex] + (wordIndex < widths.length - 1 ? spaceWidth : 0);
-                  clipWidth = startX + within * (endX - startX);
-                } else {
-                  clipWidth = 0;
-                }
-              }
-
-              const fitScaleX = fullWidth > 0 ? Math.min(1, containerWidth / fullWidth) : 1;
-              const fullWidthScaled = fullWidth * fitScaleX;
-              const clipWidthScaled = clipWidth * fitScaleX;
-
-              const leftX = project.text.textAlign === 'center'
-                ? x - fullWidthScaled / 2
-                : project.text.textAlign === 'right'
-                  ? x - fullWidthScaled
-                  : x;
-
-              const highlightRgb = (() => {
-                const raw = (project.lyrics.highlightBgColor || '#FFD60A').trim();
-                const hex = raw.startsWith('#') ? raw.slice(1) : raw;
-                const full = hex.length === 3
-                  ? `${hex[0]}${hex[0]}${hex[1]}${hex[1]}${hex[2]}${hex[2]}`
-                  : hex;
-                const r = parseInt(full.slice(0, 2), 16);
-                const g = parseInt(full.slice(2, 4), 16);
-                const b = parseInt(full.slice(4, 6), 16);
-                if (![r, g, b].every(Number.isFinite)) return { r: 255, g: 214, b: 10 };
-                return { r, g, b };
-              })();
-
-              ctx.save();
-              ctx.globalAlpha = transitionOpacity.contentOpacity * project.lyrics.highlightIntensity;
-              ctx.shadowColor = 'rgba(0,0,0,0.85)';
-              ctx.shadowBlur = 26;
-              ctx.shadowOffsetY = 8;
-
-              const y = activeLineY;
-
-              // Colored highlight background behind the revealed portion
-              const bgAlpha = Math.min(1, 0.12 + project.lyrics.highlightIntensity * 0.45);
-              const bgY = y - activeFont * 0.82;
-              const bgH = activeFont * 1.64;
-              const w = Math.max(0, clipWidthScaled);
-              ctx.save();
-              ctx.shadowColor = 'transparent';
-              ctx.shadowBlur = 0;
-              ctx.shadowOffsetY = 0;
-              ctx.fillStyle = `rgba(${highlightRgb.r}, ${highlightRgb.g}, ${highlightRgb.b}, ${bgAlpha})`;
+              ctx.globalAlpha = transitionOpacity.contentOpacity * 0.3;
+              ctx.fillStyle = 'rgba(255,255,255,0.2)';
               if ((ctx as any).roundRect) {
                 ctx.beginPath();
-                (ctx as any).roundRect(leftX, bgY, w, bgH, 12);
+                (ctx as any).roundRect(barX, barY, barWidth, barHeight, 2);
                 ctx.fill();
               } else {
-                ctx.fillRect(leftX, bgY, w, bgH);
+                ctx.fillRect(barX, barY, barWidth, barHeight);
               }
-              ctx.restore();
 
-              ctx.beginPath();
-              ctx.rect(leftX, y - activeFont, Math.max(0, clipWidthScaled), activeFont * 2);
-              ctx.clip();
-
-              ctx.save();
-              ctx.translate(x, y);
-              ctx.scale(fitScaleX, 1);
-              ctx.fillText(karaokeText, 0, 0);
-              ctx.restore();
-              ctx.restore();
-              ctx.restore();
-            }
-
-            if (project.lyrics.displayMode === 'lines') {
-              // Next
-              ctx.save();
-              ctx.globalAlpha = transitionOpacity.contentOpacity * 0.35;
-              ctx.font = `${fontPrefix}${sideFont}px ${project.text.fontFamily}`;
-              ctx.fillText(next, x, centerY + gap);
+              // Progress
+              ctx.globalAlpha = transitionOpacity.contentOpacity * 0.8;
+              ctx.fillStyle = `rgba(${highlightRgb.r}, ${highlightRgb.g}, ${highlightRgb.b}, 0.8)`;
+              if ((ctx as any).roundRect) {
+                ctx.beginPath();
+                (ctx as any).roundRect(barX, barY, barWidth * progress, barHeight, 2);
+                ctx.fill();
+              } else {
+                ctx.fillRect(barX, barY, barWidth * progress, barHeight);
+              }
               ctx.restore();
             }
 

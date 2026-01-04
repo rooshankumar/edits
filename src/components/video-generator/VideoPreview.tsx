@@ -3,8 +3,9 @@ import { Maximize2, Minimize2 } from 'lucide-react';
 import { VideoProject, CANVAS_SIZES } from '@/types/video-project';
 import { computeScrollState, calculateScrollPosition, calculateRelativeFontSize, calculateTransitionOpacity } from '@/utils/timeline';
 import { getScaledTextSettings } from '@/utils/textScaling';
-import { parseKaraokeLrc, findActiveKaraokeLineIndex, findKaraokeWordProgress, scaleKaraokeLrc, detectKaraokeStanzaBreaks } from '@/utils/karaokeLrc';
+import { parseKaraokeLrc, findActiveKaraokeLineIndex, findKaraokeWordProgress, scaleKaraokeLrc, detectKaraokeStanzaBreaks, getKaraokeProgress, getKaraokePageInfo, getEstimatedWordProgress } from '@/utils/karaokeLrc';
 import { cn } from '@/lib/utils';
+import { KaraokeLyrics } from './KaraokeLyrics';
 
 interface VideoPreviewProps {
   project: VideoProject;
@@ -450,223 +451,20 @@ export const VideoPreview = forwardRef<HTMLDivElement, VideoPreviewProps>(
                 style={{ opacity: transitionOpacity.contentOpacity, transition: 'opacity 0.5s ease-in-out' }}
               >
                 {project.theme === 'lyrics' ? (
-                  <div
-                    className={cn(
-                      'w-full h-full flex flex-col justify-center',
-                      project.text.textAlign === 'left' && 'items-start',
-                      project.text.textAlign === 'center' && 'items-center',
-                      project.text.textAlign === 'right' && 'items-end'
-                    )}
-                    style={{
-                      paddingTop: `${scaledPaddingY}px`,
-                      paddingBottom: `${scaledPaddingY}px`,
-                      paddingLeft: `${scaledPaddingX}px`,
-                      paddingRight: `${scaledPaddingX}px`,
-                    }}
-                  >
-                    {(() => {
-                      const idx = getLyricsLineIndex();
-
-                      const getStanzaBounds = () => {
-                        if (project.lyrics.displayMode === 'lines') return { start: idx, end: idx };
-
-                        if (project.lyrics.displayMode === 'full') return { start: 0, end: lyricLines.length - 1 };
-
-                        if (project.lyrics.timingSource === 'lrc' && stanzaBreaks.length > 0) {
-                          let start = 0;
-                          for (const b of stanzaBreaks) {
-                            if (b <= idx) start = b;
-                            else break;
-                          }
-                          let end = lyricLines.length - 1;
-                          for (const b of stanzaBreaks) {
-                            if (b > idx) { end = b - 1; break; }
-                          }
-                          return { start, end };
-                        }
-
-                        if (project.lyrics.timingSource === 'lrc' && karaokeLrc) {
-                          const gapBreakSeconds = 1.25;
-                          let start = idx;
-                          while (start > 0) {
-                            const prev = karaokeLrc.lines[start - 1];
-                            const curr = karaokeLrc.lines[start];
-                            if (!prev || !curr) break;
-                            const gap = curr.start - prev.end;
-                            if (gap > gapBreakSeconds) break;
-                            start--;
-                          }
-                          let end = idx;
-                          while (end < karaokeLrc.lines.length - 1) {
-                            const curr = karaokeLrc.lines[end];
-                            const next = karaokeLrc.lines[end + 1];
-                            if (!curr || !next) break;
-                            const gap = next.start - curr.end;
-                            if (gap > gapBreakSeconds) break;
-                            end++;
-                          }
-                          return { start, end };
-                        }
-
-                        let start = idx;
-                        while (start > 0 && (lyricLines[start - 1] ?? '').trim().length > 0) start--;
-                        let end = idx;
-                        while (end < lyricLines.length - 1 && (lyricLines[end + 1] ?? '').trim().length > 0) end++;
-                        return { start, end };
-                      };
-
-                      const { start, end } = getStanzaBounds();
-                      const stanza = lyricLines.slice(start, end + 1);
-
-                      const prev = project.lyrics.displayMode === 'lines' ? (lyricLines[idx - 1] ?? '') : '';
-                      const curr = lyricLines[idx] ?? '';
-                      const next = project.lyrics.displayMode === 'lines' ? (lyricLines[idx + 1] ?? '') : '';
-
-                      const karaokeText = (curr || displayContent).toString();
-                      const common: React.CSSProperties = {
-                        fontFamily: project.text.fontFamily,
-                        fontWeight: project.text.isBold ? 'bold' : 'normal',
-                        fontStyle: project.text.isItalic ? 'italic' : 'normal',
-                        letterSpacing: `${scaledLetterSpacing}px`,
-                        textAlign: project.text.textAlign,
-                        color: project.text.color,
-                        width: `${project.text.containerWidth}%`,
-                        textShadow: '0 6px 18px rgba(0,0,0,0.55)',
-                      };
-
-                      const lrcLine = (project.lyrics.timingSource === 'lrc' && karaokeLrc)
-                        ? karaokeLrc.lines[idx]
-                        : null;
-
-                      const karaokeTokens = (project.lyrics.timingSource === 'lrc' && lrcLine && lrcLine.words.length > 0)
-                        ? lrcLine.words.map((w) => w.text)
-                        : null;
-
-                      const highlightRgb = (() => {
-                        const raw = (project.lyrics.highlightBgColor || '#FFD60A').trim();
-                        const hex = raw.startsWith('#') ? raw.slice(1) : raw;
-                        const full = hex.length === 3
-                          ? `${hex[0]}${hex[0]}${hex[1]}${hex[1]}${hex[2]}${hex[2]}`
-                          : hex;
-                        const r = parseInt(full.slice(0, 2), 16);
-                        const g = parseInt(full.slice(2, 4), 16);
-                        const b = parseInt(full.slice(4, 6), 16);
-                        if (![r, g, b].every(Number.isFinite)) return { r: 255, g: 214, b: 10 };
-                        return { r, g, b };
-                      })();
-
-                      const highlightBgOpacity = Math.min(1, 0.12 + project.lyrics.highlightIntensity * 0.45);
-
-                      return (
-                        <>
-                          {project.lyrics.displayMode === 'lines' ? (
-                            <>
-                              <div style={{ ...common, opacity: 0.35, fontSize: `${scaledFontSize * 0.7}px`, lineHeight: scaledSettings.lineHeight }} className="mb-3">
-                                {prev}
-                              </div>
-                              <div style={{ ...common, opacity: 1, fontSize: `${scaledFontSize * 1.25}px`, lineHeight: scaledSettings.lineHeight }} className={cn(!project.text.content && 'text-white/30 italic')}>
-                                <span className="relative inline-block" style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
-                                  <span className="relative">
-                                    {karaokeTokens ? karaokeTokens.map((t, i) => <span key={i}>{t}</span>) : karaokeText}
-                                  </span>
-                                  {project.text.waveAnimation && karaokeClip && (
-                                    <>
-                                      <span
-                                        className="absolute inset-0 pointer-events-none"
-                                        style={{
-                                          clipPath: `inset(0px ${karaokeClip.rightInsetPx}px 0px 0px)`,
-                                          background: `rgba(${highlightRgb.r}, ${highlightRgb.g}, ${highlightRgb.b}, ${highlightBgOpacity})`,
-                                          borderRadius: 10,
-                                          willChange: 'clip-path',
-                                        }}
-                                      />
-                                      <span
-                                        className="absolute inset-0 pointer-events-none"
-                                        style={{
-                                          clipPath: `inset(0px ${karaokeClip.rightInsetPx}px 0px 0px)`,
-                                          filter: 'drop-shadow(0 0 18px rgba(0,0,0,0.85)) drop-shadow(0 0 36px rgba(0,0,0,0.55))',
-                                          opacity: project.lyrics.highlightIntensity,
-                                          willChange: 'clip-path',
-                                        }}
-                                      >
-                                        {karaokeTokens ? karaokeTokens.map((t, i) => <span key={i}>{t}</span>) : karaokeText}
-                                      </span>
-                                    </>
-                                  )}
-                                </span>
-                              </div>
-                              <div style={{ ...common, opacity: 0.35, fontSize: `${scaledFontSize * 0.7}px`, lineHeight: scaledSettings.lineHeight }} className="mt-3">
-                                {next}
-                              </div>
-                            </>
-                          ) : (
-                            <div className="flex flex-col items-center justify-center" style={{ width: '100%' }}>
-                              {stanza.map((line, i) => {
-                                const isActive = start + i === idx;
-                                const fullFit = project.lyrics.displayMode === 'full'
-                                  ? Math.max(0.55, Math.min(1, 12 / Math.max(12, stanza.length)))
-                                  : 1;
-                                const base = scaledFontSize * (project.lyrics.displayMode === 'full' ? 0.92 * fullFit : 0.9);
-                                const activeScale = project.lyrics.displayMode === 'pages' ? 1.2 : project.lyrics.displayMode === 'full' ? 1.15 : 1.15;
-                                const fontSize = isActive ? base * activeScale : base;
-                                const opacity = isActive ? 1 : 0.35;
-                                const lineText = (line || '').toString();
-
-                                // Keep preview stable/perf-friendly: avoid per-render DOM measurement.
-                                // Export uses precise canvas measurement; preview is allowed to wrap.
-                                const fitScaleX = 1;
-
-                                const lineGap = Math.max(0, (scaledSettings.lineHeight - 1) * fontSize);
-
-                                const isActiveWithOverlay = isActive;
-
-                                return (
-                                  <div
-                                    key={`${start + i}-${lineText}`}
-                                    style={{ ...common, opacity, fontSize: `${fontSize}px`, lineHeight: scaledSettings.lineHeight, marginTop: i === 0 ? 0 : `${Math.round(lineGap)}px`, transform: `scaleX(${fitScaleX})`, transformOrigin: project.text.textAlign === 'left' ? 'left center' : project.text.textAlign === 'right' ? 'right center' : 'center center' }}
-                                  >
-                                    {isActiveWithOverlay ? (
-                                      <span className="relative inline-block" style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
-                                        <span className="relative">
-                                          {karaokeTokens ? karaokeTokens.map((t, j) => <span key={j}>{t}</span>) : lineText}
-                                        </span>
-                                        {project.text.waveAnimation && karaokeClip && (
-                                          <>
-                                            <span
-                                              className="absolute inset-0 pointer-events-none"
-                                              style={{
-                                                clipPath: `inset(0px ${karaokeClip.rightInsetPx}px 0px 0px)`,
-                                                background: `rgba(${highlightRgb.r}, ${highlightRgb.g}, ${highlightRgb.b}, ${highlightBgOpacity})`,
-                                                borderRadius: 10,
-                                                willChange: 'clip-path',
-                                              }}
-                                            />
-                                            <span
-                                              className="absolute inset-0 pointer-events-none"
-                                              style={{
-                                                clipPath: `inset(0px ${karaokeClip.rightInsetPx}px 0px 0px)`,
-                                                filter: 'drop-shadow(0 0 18px rgba(0,0,0,0.85)) drop-shadow(0 0 36px rgba(0,0,0,0.55))',
-                                                opacity: project.lyrics.highlightIntensity,
-                                                willChange: 'clip-path',
-                                              }}
-                                            >
-                                              {karaokeTokens ? karaokeTokens.map((t, j) => <span key={j}>{t}</span>) : lineText}
-                                            </span>
-                                          </>
-                                        )}
-                                      </span>
-                                    ) : (
-                                      lineText
-                                    )}
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          )}
-                        </>
-                      );
-                    })()}
-                  </div>
+                  <KaraokeLyrics
+                    project={project}
+                    currentTime={currentTime}
+                    contentDuration={contentDuration}
+                    karaokeLrc={karaokeLrc}
+                    lyricLines={lyricLines}
+                    lyricsTiming={lyricsTiming}
+                    scaledFontSize={scaledFontSize}
+                    scaledPaddingX={scaledPaddingX}
+                    scaledPaddingY={scaledPaddingY}
+                    scaledLetterSpacing={scaledLetterSpacing}
+                    scaledLineHeight={scaledSettings.lineHeight}
+                    transitionOpacity={transitionOpacity.contentOpacity}
+                  />
                 ) : (
                   <div ref={textRef} style={textStyle} className={cn(!project.text.content && 'text-white/30 italic')}>
                     {renderWaveText(displayContent)}
