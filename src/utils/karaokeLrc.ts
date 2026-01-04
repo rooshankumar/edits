@@ -188,6 +188,13 @@ export const findActiveKaraokeLineIndex = (lines: KaraokeLine[], t: number): num
   return 0;
 };
 
+export interface KaraokeProgress {
+  lineIndex: number;
+  wordIndex: number;
+  within: number;
+  highlightedWords: number[];
+}
+
 export const findKaraokeWordProgress = (
   line: KaraokeLine,
   t: number
@@ -206,4 +213,79 @@ export const findKaraokeWordProgress = (
   const within = Math.max(0, Math.min(1, (tt - w.start) / denom));
 
   return { wordIndex, within };
+};
+
+/**
+ * Get full karaoke progress including all highlighted words
+ */
+export const getKaraokeProgress = (
+  lrc: KaraokeLrc,
+  t: number,
+  offsetSeconds: number = 0,
+  leadSeconds: number = 0
+): KaraokeProgress => {
+  const adjustedTime = t + offsetSeconds + leadSeconds;
+  const lineIndex = findActiveKaraokeLineIndex(lrc.lines, t + offsetSeconds);
+  const line = lrc.lines[lineIndex];
+  
+  if (!line) {
+    return { lineIndex: 0, wordIndex: 0, within: 0, highlightedWords: [] };
+  }
+
+  const { wordIndex, within } = findKaraokeWordProgress(line, adjustedTime);
+  
+  // All words before current are fully highlighted
+  const highlightedWords: number[] = [];
+  for (let i = 0; i <= wordIndex; i++) {
+    highlightedWords.push(i);
+  }
+
+  return { lineIndex, wordIndex, within, highlightedWords };
+};
+
+/**
+ * Calculate which page of lyrics should be shown
+ */
+export const getKaraokePageInfo = (
+  totalLines: number,
+  activeLineIndex: number,
+  linesPerPage: number
+): { currentPage: number; pageStart: number; pageEnd: number; totalPages: number } => {
+  const safeLinesPerPage = Math.max(1, linesPerPage);
+  const totalPages = Math.ceil(totalLines / safeLinesPerPage);
+  const currentPage = Math.floor(activeLineIndex / safeLinesPerPage);
+  const pageStart = currentPage * safeLinesPerPage;
+  const pageEnd = Math.min(totalLines - 1, pageStart + safeLinesPerPage - 1);
+  
+  return { currentPage, pageStart, pageEnd, totalPages };
+};
+
+/**
+ * Get word-level highlight info for estimated timing (non-LRC)
+ */
+export const getEstimatedWordProgress = (
+  lineText: string,
+  lineDuration: number,
+  timeInLine: number,
+  leadSeconds: number = 0
+): { wordIndex: number; within: number; highlightedWords: number[] } => {
+  const words = lineText.trim().split(/\s+/).filter(Boolean);
+  const wordCount = Math.max(1, words.length);
+  
+  if (lineDuration <= 0) {
+    return { wordIndex: 0, within: 0, highlightedWords: [] };
+  }
+
+  const wordDuration = lineDuration / wordCount;
+  const effectiveTime = Math.max(0, Math.min(lineDuration, timeInLine + leadSeconds));
+  
+  const wordIndex = Math.min(wordCount - 1, Math.floor(effectiveTime / wordDuration));
+  const within = Math.max(0, Math.min(1, (effectiveTime - wordIndex * wordDuration) / wordDuration));
+  
+  const highlightedWords: number[] = [];
+  for (let i = 0; i <= wordIndex; i++) {
+    highlightedWords.push(i);
+  }
+
+  return { wordIndex, within, highlightedWords };
 };

@@ -104,6 +104,8 @@ export interface EndingSettings {
   showQR: boolean;
 }
 
+export type WordHighlightStyle = 'sweep' | 'fill' | 'glow';
+
 export interface LyricsThemeSettings {
   timingSource: LyricsTimingSource;
   karaokeLrc: string;
@@ -116,6 +118,11 @@ export interface LyricsThemeSettings {
   minLineDuration: number;
   highlightLeadSeconds: number;
   highlightIntensity: number;
+  // Page-by-page karaoke settings
+  linesPerPage: number;
+  pageTransitionDuration: number;
+  wordHighlightStyle: WordHighlightStyle;
+  showProgressBar: boolean;
 }
 
 export interface VideoProject {
@@ -193,7 +200,7 @@ export const DEFAULT_PROJECT: Omit<VideoProject, 'id' | 'createdAt' | 'updatedAt
   lyrics: {
     timingSource: 'estimate',
     karaokeLrc: '',
-    displayMode: 'lines',
+    displayMode: 'pages',
     autoFitLrcToAudio: true,
     lrcOffsetSeconds: 0,
     highlightBgColor: '#FFD60A',
@@ -202,6 +209,10 @@ export const DEFAULT_PROJECT: Omit<VideoProject, 'id' | 'createdAt' | 'updatedAt
     minLineDuration: 1.4,
     highlightLeadSeconds: 0.08,
     highlightIntensity: 0.85,
+    linesPerPage: 4,
+    pageTransitionDuration: 0.3,
+    wordHighlightStyle: 'sweep',
+    showProgressBar: true,
   },
   canvasFormat: 'vertical',
   text: {
