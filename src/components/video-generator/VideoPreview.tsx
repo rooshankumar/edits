@@ -6,6 +6,7 @@ import { getScaledTextSettings } from '@/utils/textScaling';
 import { parseKaraokeLrc, findActiveKaraokeLineIndex, findKaraokeWordProgress, scaleKaraokeLrc, detectKaraokeStanzaBreaks, getKaraokeProgress, getKaraokePageInfo, getEstimatedWordProgress } from '@/utils/karaokeLrc';
 import { cn } from '@/lib/utils';
 import { KaraokeLyrics } from './KaraokeLyrics';
+import { ReelsLyrics } from './ReelsLyrics';
 
 interface VideoPreviewProps {
   project: VideoProject;
@@ -450,7 +451,14 @@ export const VideoPreview = forwardRef<HTMLDivElement, VideoPreviewProps>(
                   project.animation.direction === 'up' ? 'flex-col items-center' : 'items-center')}
                 style={{ opacity: transitionOpacity.contentOpacity, transition: 'opacity 0.5s ease-in-out' }}
               >
-                {project.theme === 'lyrics' ? (
+                {project.theme === 'reels' ? (
+                  <ReelsLyrics
+                    project={project}
+                    currentTime={currentTime}
+                    contentDuration={contentDuration}
+                    scaleFactor={scaleFactor}
+                  />
+                ) : project.theme === 'lyrics' ? (
                   <KaraokeLyrics
                     project={project}
                     currentTime={currentTime}

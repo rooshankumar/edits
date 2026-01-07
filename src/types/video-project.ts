@@ -1,5 +1,5 @@
 export type CanvasFormat = 'vertical' | 'horizontal' | 'square' | 'tiktok' | 'youtube-shorts' | 'instagram-post' | 'twitter' | 'facebook-cover';
-export type VideoTheme = 'vertical' | 'lyrics';
+export type VideoTheme = 'vertical' | 'lyrics' | 'reels';
 export type LyricsPacingSource = 'wpm' | 'chars';
 export type LyricsTimingSource = 'estimate' | 'lrc';
 export type LyricsDisplayMode = 'lines' | 'paragraph' | 'pages' | 'full';
@@ -125,11 +125,31 @@ export interface LyricsThemeSettings {
   showProgressBar: boolean;
 }
 
+export interface ReelsThemeSettings {
+  // Word highlight style
+  highlightColor: string;
+  highlightOpacity: number;
+  unhighlightedOpacity: number;
+  
+  // Display settings
+  linesVisible: number;
+  centerCurrentLine: boolean;
+  
+  // Animation
+  wordTransitionSpeed: number;
+  lineTransitionSpeed: number;
+  
+  // Timing
+  syncMode: 'lrc' | 'auto';
+  lrcContent: string;
+}
+
 export interface VideoProject {
   id: string;
   name: string;
   theme: VideoTheme;
   lyrics: LyricsThemeSettings;
+  reels: ReelsThemeSettings;
   canvasFormat: CanvasFormat;
   text: TextSettings;
   pagedText: PagedTextSettings;
@@ -213,6 +233,17 @@ export const DEFAULT_PROJECT: Omit<VideoProject, 'id' | 'createdAt' | 'updatedAt
     pageTransitionDuration: 0.3,
     wordHighlightStyle: 'sweep',
     showProgressBar: true,
+  },
+  reels: {
+    highlightColor: '#FFD60A',
+    highlightOpacity: 0.9,
+    unhighlightedOpacity: 0.4,
+    linesVisible: 6,
+    centerCurrentLine: true,
+    wordTransitionSpeed: 0.15,
+    lineTransitionSpeed: 0.3,
+    syncMode: 'auto',
+    lrcContent: '',
   },
   canvasFormat: 'vertical',
   text: {
