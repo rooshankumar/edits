@@ -15,7 +15,7 @@ import { computeTimeline } from '@/utils/timeline';
 export default function Index() {
   const {
     project, savedProjects, updateProject, updateText, updateBackground,
-    updateAnimation, updateAudio, updateWatermark, updateOverlay, updateEnding, updateLyrics,
+    updateAnimation, updateAudio, updateWatermark, updateOverlay, updateEnding, updateLyrics, updateReels,
     setCanvasFormat, setTheme, saveProject, loadProject, deleteProject, newProject, duplicateProject,
   } = useVideoProject();
 
@@ -220,6 +220,7 @@ export default function Index() {
               onProjectChange={updateProject}
               onThemeChange={setTheme}
               onLyricsChange={updateLyrics}
+              onReelsChange={updateReels}
               onCanvasFormatChange={setCanvasFormat}
               onTextChange={updateText}
               onBackgroundChange={updateBackground}
@@ -301,6 +302,7 @@ export default function Index() {
                 onProjectChange={updateProject}
                 onThemeChange={setTheme}
                 onLyricsChange={updateLyrics}
+                onReelsChange={updateReels}
                 onCanvasFormatChange={setCanvasFormat}
                 onTextChange={updateText}
                 onBackgroundChange={updateBackground}

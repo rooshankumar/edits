@@ -8,7 +8,7 @@ import {
 import { 
   VideoProject, TextSettings, BackgroundSettings, AnimationSettings, AudioSettings,
   WatermarkSettings, OverlayTextSettings, EndingSettings,
-  FONT_FAMILIES, CANVAS_SIZES, CanvasFormat, VideoTheme, LyricsPacingSource, LyricsThemeSettings, WPMPreset, WPM_PRESETS,
+  FONT_FAMILIES, CANVAS_SIZES, CanvasFormat, VideoTheme, LyricsPacingSource, LyricsThemeSettings, ReelsThemeSettings, WPMPreset, WPM_PRESETS,
   LyricsTimingSource, LyricsDisplayMode
 } from '@/types/video-project';
 import { TimelineState, getWPMLevel } from '@/utils/timeline';
@@ -33,6 +33,7 @@ interface CompactEditorProps {
   onProjectChange: (updates: Partial<VideoProject>) => void;
   onThemeChange: (theme: VideoTheme) => void;
   onLyricsChange: (updates: Partial<LyricsThemeSettings>) => void;
+  onReelsChange: (updates: Partial<ReelsThemeSettings>) => void;
   onCanvasFormatChange: (format: CanvasFormat) => void;
   onTextChange: (updates: Partial<TextSettings>) => void;
   onBackgroundChange: (updates: Partial<BackgroundSettings>) => void;
@@ -95,6 +96,7 @@ export function CompactEditor({
   onProjectChange,
   onThemeChange,
   onLyricsChange,
+  onReelsChange,
   onCanvasFormatChange,
   onTextChange,
   onBackgroundChange,
@@ -210,7 +212,7 @@ export function CompactEditor({
 
         <div className="p-3 bg-card border-b border-border">
           <label className="text-xs font-semibold text-foreground mb-2 block">Video Theme</label>
-          <div className="grid grid-cols-2 gap-1.5">
+          <div className="grid grid-cols-3 gap-1.5">
             <button
               onClick={() => onThemeChange('vertical')}
               className={cn(
@@ -220,7 +222,7 @@ export function CompactEditor({
                   : 'bg-card border-border'
               )}
             >
-              Vertical
+              Scroll
             </button>
             <button
               onClick={() => onThemeChange('lyrics')}
@@ -231,7 +233,18 @@ export function CompactEditor({
                   : 'bg-card border-border'
               )}
             >
-              Lyrics
+              Karaoke
+            </button>
+            <button
+              onClick={() => onThemeChange('reels')}
+              className={cn(
+                'px-2 py-1.5 text-[10px] font-medium transition-all border excel-hover',
+                project.theme === 'reels'
+                  ? 'bg-excel-selected border-primary border-2'
+                  : 'bg-card border-border'
+              )}
+            >
+              Reels
             </button>
           </div>
         </div>
@@ -441,6 +454,91 @@ export function CompactEditor({
                   step={0.05}
                 />
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* REELS Theme Settings */}
+        {project.theme === 'reels' && (
+          <div className="p-3 bg-card border-b border-border space-y-3">
+            <div>
+              <label className="text-[10px] font-medium text-muted-foreground mb-1 block">Sync Mode</label>
+              <Select
+                value={project.reels.syncMode}
+                onValueChange={(v) => onReelsChange({ syncMode: v as 'lrc' | 'auto' })}
+              >
+                <SelectTrigger className="h-7 text-[10px] border-border">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="border-border">
+                  <SelectItem value="auto" className="text-xs">Auto (estimate timing)</SelectItem>
+                  <SelectItem value="lrc" className="text-xs">LRC (word-timed)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {project.reels.syncMode === 'lrc' && (
+              <div>
+                <label className="text-[10px] font-medium text-muted-foreground mb-1 block">LRC Content</label>
+                <Textarea
+                  value={project.reels.lrcContent}
+                  onChange={(e) => onReelsChange({ lrcContent: e.target.value })}
+                  placeholder="Paste your word-timed LRC here..."
+                  className="min-h-[100px] resize-none border-border text-xs"
+                />
+              </div>
+            )}
+
+            <div className="flex items-center justify-between px-3 py-2 border border-border excel-hover">
+              <div>
+                <p className="text-[10px] font-medium">Highlight Color</p>
+                <p className="text-[9px] text-muted-foreground">Background color for highlighted words</p>
+              </div>
+              <Input
+                type="color"
+                value={project.reels.highlightColor}
+                onChange={(e) => onReelsChange({ highlightColor: e.target.value })}
+                className="h-7 w-10 p-0 border-border"
+              />
+            </div>
+
+            <div>
+              <label className="text-[10px] font-medium text-muted-foreground mb-1 block">
+                Lines visible: {project.reels.linesVisible}
+              </label>
+              <Slider
+                value={[project.reels.linesVisible]}
+                onValueChange={([v]) => onReelsChange({ linesVisible: v })}
+                min={4}
+                max={10}
+                step={1}
+              />
+            </div>
+
+            <div>
+              <label className="text-[10px] font-medium text-muted-foreground mb-1 block">
+                Unhighlighted opacity: {(project.reels.unhighlightedOpacity * 100).toFixed(0)}%
+              </label>
+              <Slider
+                value={[project.reels.unhighlightedOpacity]}
+                onValueChange={([v]) => onReelsChange({ unhighlightedOpacity: v })}
+                min={0.1}
+                max={0.8}
+                step={0.05}
+              />
+            </div>
+
+            <div>
+              <label className="text-[10px] font-medium text-muted-foreground mb-1 block">
+                Word transition: {project.reels.wordTransitionSpeed.toFixed(2)}s
+              </label>
+              <Slider
+                value={[project.reels.wordTransitionSpeed]}
+                onValueChange={([v]) => onReelsChange({ wordTransitionSpeed: v })}
+                min={0.05}
+                max={0.5}
+                step={0.01}
+              />
             </div>
           </div>
         )}

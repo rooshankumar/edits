@@ -321,7 +321,97 @@ export function useVideoExport() {
         const transitionOpacity = calculateTransitionOpacity(currentTimeSec, timeline.contentDuration, project.ending.enabled);
 
         if (!scrollState.isEnding) {
-          if (project.theme === 'lyrics') {
+          if (project.theme === 'reels') {
+            // Reels theme: static lyrics with word-by-word highlight
+            ctx.save();
+            ctx.globalAlpha = transitionOpacity.contentOpacity;
+            ctx.fillStyle = project.text.color;
+            ctx.textAlign = project.text.textAlign;
+            ctx.textBaseline = 'middle';
+
+            const fontPrefix = `${project.text.isItalic ? 'italic ' : ''}${project.text.isBold ? 'bold ' : ''}`;
+            ctx.font = `${fontPrefix}${scaledFontSize}px ${project.text.fontFamily}`;
+
+            const lyricLines = lyricLinesStatic;
+            const totalLines = Math.max(1, lyricLines.length);
+            const lineDuration = safeContentDurationStatic / totalLines;
+
+            // Find active line
+            let activeLineIndex = 0;
+            for (let i = totalLines - 1; i >= 0; i--) {
+              if (currentTimeSec >= i * lineDuration) {
+                activeLineIndex = i;
+                break;
+              }
+            }
+
+            // Calculate visible lines
+            const linesVisible = project.reels.linesVisible;
+            const half = Math.floor(linesVisible / 2);
+            let startIdx = activeLineIndex - half;
+            let endIdx = startIdx + linesVisible;
+            if (startIdx < 0) { startIdx = 0; endIdx = Math.min(linesVisible, totalLines); }
+            if (endIdx > totalLines) { endIdx = totalLines; startIdx = Math.max(0, endIdx - linesVisible); }
+
+            // Get word progress for current line
+            const lineStartTime = activeLineIndex * lineDuration;
+            const timeInLine = Math.max(0, currentTimeSec - lineStartTime);
+            const lineText = lyricLines[activeLineIndex] || '';
+            const wordProgress = getEstimatedWordProgress(lineText, lineDuration, timeInLine);
+
+            const lineHeight = scaledFontSize * project.text.lineHeight;
+            const totalHeight = (endIdx - startIdx) * lineHeight;
+            const startY = (height - totalHeight) / 2 + lineHeight / 2;
+
+            const containerWidth = (width * project.text.containerWidth) / 100;
+            let baseX = width / 2;
+            if (project.text.textAlign === 'left') baseX = (width - containerWidth) / 2 + scaledPaddingX;
+            if (project.text.textAlign === 'right') baseX = (width + containerWidth) / 2 - scaledPaddingX;
+
+            // Parse highlight color
+            const highlightColor = project.reels.highlightColor || '#FFD60A';
+
+            for (let i = startIdx; i < endIdx; i++) {
+              const y = startY + (i - startIdx) * lineHeight;
+              const text = lyricLines[i] || '';
+              const isActive = i === activeLineIndex;
+              const isPast = i < activeLineIndex;
+
+              if (isActive) {
+                // Draw word by word with highlights
+                const words = text.split(/\s+/).filter(Boolean);
+                ctx.save();
+                ctx.textAlign = 'left';
+                const lineWidth = ctx.measureText(text).width;
+                let wordX = baseX;
+                if (project.text.textAlign === 'center') wordX = baseX - lineWidth / 2;
+                if (project.text.textAlign === 'right') wordX = baseX - lineWidth;
+
+                words.forEach((word, wIdx) => {
+                  const wordWidth = ctx.measureText(word).width;
+                  const spaceWidth = ctx.measureText(' ').width;
+                  const isHighlighted = wIdx <= wordProgress.wordIndex;
+
+                  if (isHighlighted) {
+                    ctx.fillStyle = highlightColor;
+                    ctx.fillRect(wordX - 2, y - scaledFontSize * 0.4, wordWidth + 4, scaledFontSize * 0.8);
+                  }
+
+                  ctx.fillStyle = project.text.color;
+                  ctx.globalAlpha = isHighlighted ? 1 : project.reels.unhighlightedOpacity;
+                  ctx.fillText(word, wordX, y);
+                  ctx.globalAlpha = 1;
+                  wordX += wordWidth + spaceWidth;
+                });
+                ctx.restore();
+              } else {
+                ctx.globalAlpha = isPast ? 1 : project.reels.unhighlightedOpacity;
+                ctx.fillText(text, baseX, y);
+                ctx.globalAlpha = 1;
+              }
+            }
+            ctx.restore();
+          } else if (project.theme === 'lyrics') {
             ctx.save();
             ctx.globalAlpha = transitionOpacity.contentOpacity;
             ctx.fillStyle = project.text.color;
