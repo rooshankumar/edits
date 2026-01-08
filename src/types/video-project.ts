@@ -125,15 +125,36 @@ export interface LyricsThemeSettings {
   showProgressBar: boolean;
 }
 
+export type ReelsHighlightType = 'sweep' | 'glow' | 'color-change';
+export type ReelsEasingType = 'linear' | 'ease-in-out' | 'spring';
+
 export interface ReelsThemeSettings {
   // Word highlight style
   highlightColor: string;
   highlightOpacity: number;
   unhighlightedOpacity: number;
   
+  // Highlight type
+  highlightType: ReelsHighlightType;
+  glowIntensity: number;
+  easingType: ReelsEasingType;
+  
   // Display settings
   linesVisible: number;
   centerCurrentLine: boolean;
+  
+  // Typography
+  textShadow: boolean;
+  textShadowBlur: number;
+  textShadowOpacity: number;
+  
+  // Visual polish
+  vignette: boolean;
+  vignetteIntensity: number;
+  
+  // Motion
+  kinetic: boolean;
+  kineticSpeed: number;
   
   // Animation
   wordTransitionSpeed: number;
@@ -238,8 +259,18 @@ export const DEFAULT_PROJECT: Omit<VideoProject, 'id' | 'createdAt' | 'updatedAt
     highlightColor: '#FFD60A',
     highlightOpacity: 0.9,
     unhighlightedOpacity: 0.4,
+    highlightType: 'glow',
+    glowIntensity: 12,
+    easingType: 'ease-in-out',
     linesVisible: 6,
     centerCurrentLine: true,
+    textShadow: true,
+    textShadowBlur: 8,
+    textShadowOpacity: 0.6,
+    vignette: true,
+    vignetteIntensity: 0.5,
+    kinetic: true,
+    kineticSpeed: 0.15,
     wordTransitionSpeed: 0.15,
     lineTransitionSpeed: 0.3,
     syncMode: 'auto',

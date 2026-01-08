@@ -461,6 +461,7 @@ export function CompactEditor({
         {/* REELS Theme Settings */}
         {project.theme === 'reels' && (
           <div className="p-3 bg-card border-b border-border space-y-3">
+            {/* Sync Settings */}
             <div>
               <label className="text-[10px] font-medium text-muted-foreground mb-1 block">Sync Mode</label>
               <Select
@@ -489,56 +490,216 @@ export function CompactEditor({
               </div>
             )}
 
-            <div className="flex items-center justify-between px-3 py-2 border border-border excel-hover">
-              <div>
-                <p className="text-[10px] font-medium">Highlight Color</p>
-                <p className="text-[9px] text-muted-foreground">Background color for highlighted words</p>
+            {/* Highlight Style Section */}
+            <div className="pt-2 border-t border-border">
+              <label className="text-[10px] font-semibold text-foreground mb-2 block">Highlight Style</label>
+              
+              <div className="grid grid-cols-3 gap-1.5 mb-3">
+                {(['glow', 'color-change', 'sweep'] as const).map((type) => (
+                  <button
+                    key={type}
+                    onClick={() => onReelsChange({ highlightType: type })}
+                    className={cn(
+                      'px-2 py-1.5 text-[10px] font-medium transition-all border excel-hover capitalize',
+                      project.reels.highlightType === type
+                        ? 'bg-excel-selected border-primary border-2'
+                        : 'bg-card border-border'
+                    )}
+                  >
+                    {type === 'color-change' ? 'Color' : type}
+                  </button>
+                ))}
               </div>
-              <Input
-                type="color"
-                value={project.reels.highlightColor}
-                onChange={(e) => onReelsChange({ highlightColor: e.target.value })}
-                className="h-7 w-10 p-0 border-border"
-              />
+
+              <div className="flex items-center justify-between px-3 py-2 border border-border excel-hover">
+                <div>
+                  <p className="text-[10px] font-medium">Highlight Color</p>
+                </div>
+                <Input
+                  type="color"
+                  value={project.reels.highlightColor}
+                  onChange={(e) => onReelsChange({ highlightColor: e.target.value })}
+                  className="h-7 w-10 p-0 border-border"
+                />
+              </div>
+
+              {project.reels.highlightType === 'glow' && (
+                <div className="mt-2">
+                  <label className="text-[10px] font-medium text-muted-foreground mb-1 block">
+                    Glow intensity: {project.reels.glowIntensity}px
+                  </label>
+                  <Slider
+                    value={[project.reels.glowIntensity]}
+                    onValueChange={([v]) => onReelsChange({ glowIntensity: v })}
+                    min={4}
+                    max={30}
+                    step={1}
+                  />
+                </div>
+              )}
+
+              <div className="mt-2">
+                <label className="text-[10px] font-medium text-muted-foreground mb-1 block">Animation Easing</label>
+                <Select
+                  value={project.reels.easingType}
+                  onValueChange={(v) => onReelsChange({ easingType: v as 'linear' | 'ease-in-out' | 'spring' })}
+                >
+                  <SelectTrigger className="h-7 text-[10px] border-border">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="border-border">
+                    <SelectItem value="ease-in-out" className="text-xs">Smooth (ease-in-out)</SelectItem>
+                    <SelectItem value="spring" className="text-xs">Bouncy (spring)</SelectItem>
+                    <SelectItem value="linear" className="text-xs">Linear</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
 
-            <div>
-              <label className="text-[10px] font-medium text-muted-foreground mb-1 block">
-                Lines visible: {project.reels.linesVisible}
-              </label>
-              <Slider
-                value={[project.reels.linesVisible]}
-                onValueChange={([v]) => onReelsChange({ linesVisible: v })}
-                min={4}
-                max={10}
-                step={1}
-              />
+            {/* Visual Polish Section */}
+            <div className="pt-2 border-t border-border">
+              <label className="text-[10px] font-semibold text-foreground mb-2 block">Visual Style</label>
+              
+              <div className="flex items-center justify-between px-3 py-2 border border-border excel-hover">
+                <div>
+                  <p className="text-[10px] font-medium">Text Shadow</p>
+                  <p className="text-[9px] text-muted-foreground">Drop shadow for depth</p>
+                </div>
+                <Switch
+                  checked={project.reels.textShadow}
+                  onCheckedChange={(checked) => onReelsChange({ textShadow: checked })}
+                />
+              </div>
+
+              {project.reels.textShadow && (
+                <>
+                  <div className="mt-2">
+                    <label className="text-[10px] font-medium text-muted-foreground mb-1 block">
+                      Shadow blur: {project.reels.textShadowBlur}px
+                    </label>
+                    <Slider
+                      value={[project.reels.textShadowBlur]}
+                      onValueChange={([v]) => onReelsChange({ textShadowBlur: v })}
+                      min={2}
+                      max={20}
+                      step={1}
+                    />
+                  </div>
+                  <div className="mt-2">
+                    <label className="text-[10px] font-medium text-muted-foreground mb-1 block">
+                      Shadow opacity: {(project.reels.textShadowOpacity * 100).toFixed(0)}%
+                    </label>
+                    <Slider
+                      value={[project.reels.textShadowOpacity]}
+                      onValueChange={([v]) => onReelsChange({ textShadowOpacity: v })}
+                      min={0.1}
+                      max={1}
+                      step={0.05}
+                    />
+                  </div>
+                </>
+              )}
+
+              <div className="flex items-center justify-between px-3 py-2 border border-border excel-hover mt-2">
+                <div>
+                  <p className="text-[10px] font-medium">Vignette</p>
+                  <p className="text-[9px] text-muted-foreground">Darken edges for focus</p>
+                </div>
+                <Switch
+                  checked={project.reels.vignette}
+                  onCheckedChange={(checked) => onReelsChange({ vignette: checked })}
+                />
+              </div>
+
+              {project.reels.vignette && (
+                <div className="mt-2">
+                  <label className="text-[10px] font-medium text-muted-foreground mb-1 block">
+                    Vignette intensity: {(project.reels.vignetteIntensity * 100).toFixed(0)}%
+                  </label>
+                  <Slider
+                    value={[project.reels.vignetteIntensity]}
+                    onValueChange={([v]) => onReelsChange({ vignetteIntensity: v })}
+                    min={0.1}
+                    max={0.8}
+                    step={0.05}
+                  />
+                </div>
+              )}
             </div>
 
-            <div>
-              <label className="text-[10px] font-medium text-muted-foreground mb-1 block">
-                Unhighlighted opacity: {(project.reels.unhighlightedOpacity * 100).toFixed(0)}%
-              </label>
-              <Slider
-                value={[project.reels.unhighlightedOpacity]}
-                onValueChange={([v]) => onReelsChange({ unhighlightedOpacity: v })}
-                min={0.1}
-                max={0.8}
-                step={0.05}
-              />
+            {/* Motion Section */}
+            <div className="pt-2 border-t border-border">
+              <label className="text-[10px] font-semibold text-foreground mb-2 block">Motion</label>
+              
+              <div className="flex items-center justify-between px-3 py-2 border border-border excel-hover">
+                <div>
+                  <p className="text-[10px] font-medium">Kinetic Scroll</p>
+                  <p className="text-[9px] text-muted-foreground">Gentle upward drift</p>
+                </div>
+                <Switch
+                  checked={project.reels.kinetic}
+                  onCheckedChange={(checked) => onReelsChange({ kinetic: checked })}
+                />
+              </div>
+
+              {project.reels.kinetic && (
+                <div className="mt-2">
+                  <label className="text-[10px] font-medium text-muted-foreground mb-1 block">
+                    Kinetic speed: {project.reels.kineticSpeed.toFixed(2)}
+                  </label>
+                  <Slider
+                    value={[project.reels.kineticSpeed]}
+                    onValueChange={([v]) => onReelsChange({ kineticSpeed: v })}
+                    min={0.05}
+                    max={0.5}
+                    step={0.01}
+                  />
+                </div>
+              )}
             </div>
 
-            <div>
-              <label className="text-[10px] font-medium text-muted-foreground mb-1 block">
-                Word transition: {project.reels.wordTransitionSpeed.toFixed(2)}s
-              </label>
-              <Slider
-                value={[project.reels.wordTransitionSpeed]}
-                onValueChange={([v]) => onReelsChange({ wordTransitionSpeed: v })}
-                min={0.05}
-                max={0.5}
-                step={0.01}
-              />
+            {/* Display Section */}
+            <div className="pt-2 border-t border-border">
+              <label className="text-[10px] font-semibold text-foreground mb-2 block">Display</label>
+              
+              <div>
+                <label className="text-[10px] font-medium text-muted-foreground mb-1 block">
+                  Lines visible: {project.reels.linesVisible}
+                </label>
+                <Slider
+                  value={[project.reels.linesVisible]}
+                  onValueChange={([v]) => onReelsChange({ linesVisible: v })}
+                  min={4}
+                  max={10}
+                  step={1}
+                />
+              </div>
+
+              <div className="mt-2">
+                <label className="text-[10px] font-medium text-muted-foreground mb-1 block">
+                  Unhighlighted opacity: {(project.reels.unhighlightedOpacity * 100).toFixed(0)}%
+                </label>
+                <Slider
+                  value={[project.reels.unhighlightedOpacity]}
+                  onValueChange={([v]) => onReelsChange({ unhighlightedOpacity: v })}
+                  min={0.1}
+                  max={0.8}
+                  step={0.05}
+                />
+              </div>
+
+              <div className="mt-2">
+                <label className="text-[10px] font-medium text-muted-foreground mb-1 block">
+                  Word transition: {project.reels.wordTransitionSpeed.toFixed(2)}s
+                </label>
+                <Slider
+                  value={[project.reels.wordTransitionSpeed]}
+                  onValueChange={([v]) => onReelsChange({ wordTransitionSpeed: v })}
+                  min={0.05}
+                  max={0.5}
+                  step={0.01}
+                />
+              </div>
             </div>
           </div>
         )}
