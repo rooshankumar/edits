@@ -5,7 +5,7 @@ import { computeScrollState, calculateScrollPosition, calculateRelativeFontSize,
 import { getScaledTextSettings } from '@/utils/textScaling';
 import { parseKaraokeLrc, findActiveKaraokeLineIndex, findKaraokeWordProgress, scaleKaraokeLrc, detectKaraokeStanzaBreaks, getKaraokeProgress, getKaraokePageInfo, getEstimatedWordProgress } from '@/utils/karaokeLrc';
 import { cn } from '@/lib/utils';
-import { KaraokeLyrics } from './KaraokeLyrics';
+import { KaraokeLyricsCanvas } from './KaraokeLyricsCanvas';
 import { ReelsLyrics } from './ReelsLyrics';
 
 interface VideoPreviewProps {
@@ -74,7 +74,8 @@ export const VideoPreview = forwardRef<HTMLDivElement, VideoPreviewProps>(
 
     // Calculate relative sizes based on actual preview height (matches export logic)
     const previewHeight = containerRef.current?.offsetHeight || canvasSize.height;
-    const scaleFactor = previewHeight / canvasSize.height;
+    const previewWidth = containerRef.current?.offsetWidth || canvasSize.width;
+    const scaleFactor = Math.min(previewWidth / canvasSize.width, previewHeight / canvasSize.height);
     
     const karaokeLrc = useMemo(() => {
       if (project.theme !== 'lyrics') return null;
@@ -123,6 +124,10 @@ export const VideoPreview = forwardRef<HTMLDivElement, VideoPreviewProps>(
     const scaledPaddingY = Math.round((scaledSettings.paddingY / 1920) * canvasSize.height * scaleFactor);
     const scaledLetterSpacing = scaledSettings.letterSpacing * scaleFactor;
 
+    // Enforce a minimum horizontal safe-area padding (~1cm on typical mobile DPI)
+    const minSafePaddingX = Math.round(75 * scaleFactor);
+    const effectivePaddingX = Math.max(scaledPaddingX, minSafePaddingX);
+
     const textStyle: React.CSSProperties = useMemo(() => ({
       fontFamily: project.text.fontFamily,
       fontSize: `${scaledFontSize}px`,
@@ -134,12 +139,12 @@ export const VideoPreview = forwardRef<HTMLDivElement, VideoPreviewProps>(
       color: project.text.color,
       whiteSpace: 'pre-wrap',
       width: `${project.text.containerWidth}%`,
-      paddingLeft: `${scaledPaddingX}px`,
-      paddingRight: `${scaledPaddingX}px`,
+      paddingLeft: `${effectivePaddingX}px`,
+      paddingRight: `${effectivePaddingX}px`,
       paddingTop: `${scaledPaddingY}px`,
       paddingBottom: `${scaledPaddingY}px`,
       ...getTransformStyle(),
-    }), [project.text, scaledFontSize, scaledPaddingX, scaledPaddingY, scaledLetterSpacing, getTransformStyle]);
+    }), [effectivePaddingX, project.text, scaledFontSize, scaledPaddingY, scaledLetterSpacing, scaledSettings.lineHeight, getTransformStyle]);
 
     useEffect(() => {
       const handleEsc = (e: KeyboardEvent) => {
@@ -459,7 +464,7 @@ export const VideoPreview = forwardRef<HTMLDivElement, VideoPreviewProps>(
                     scaleFactor={scaleFactor}
                   />
                 ) : project.theme === 'lyrics' ? (
-                  <KaraokeLyrics
+                  <KaraokeLyricsCanvas
                     project={project}
                     currentTime={currentTime}
                     contentDuration={contentDuration}
@@ -467,11 +472,11 @@ export const VideoPreview = forwardRef<HTMLDivElement, VideoPreviewProps>(
                     lyricLines={lyricLines}
                     lyricsTiming={lyricsTiming}
                     scaledFontSize={scaledFontSize}
-                    scaledPaddingX={scaledPaddingX}
+                    scaledPaddingX={effectivePaddingX}
                     scaledPaddingY={scaledPaddingY}
-                    scaledLetterSpacing={scaledLetterSpacing}
                     scaledLineHeight={scaledSettings.lineHeight}
                     transitionOpacity={transitionOpacity.contentOpacity}
+                    scaleFactor={scaleFactor}
                   />
                 ) : (
                   <div ref={textRef} style={textStyle} className={cn(!project.text.content && 'text-white/30 italic')}>

@@ -137,6 +137,10 @@ export function useVideoExport() {
       const scaledFontSize = calculateRelativeFontSize(scaledSettings.fontSize, height);
       const scaledPaddingX = Math.round((scaledSettings.paddingX / 1920) * height);
       const scaledPaddingY = Math.round((scaledSettings.paddingY / 1920) * height);
+
+      // Enforce a minimum horizontal safe-area padding (~1cm on typical mobile DPI)
+      const minSafePaddingX = 75;
+      const effectivePaddingX = Math.max(scaledPaddingX, minSafePaddingX);
       
       // Calculate text metrics for scrolling
       ctx.font = `${project.text.isItalic ? 'italic ' : ''}${project.text.isBold ? 'bold ' : ''}${scaledFontSize}px ${project.text.fontFamily}`;
@@ -320,6 +324,33 @@ export function useVideoExport() {
         // Calculate transition opacity for smooth fade
         const transitionOpacity = calculateTransitionOpacity(currentTimeSec, timeline.contentDuration, project.ending.enabled);
 
+        // Title Overlay - centered at top (during content only)
+        if (!scrollState.isEnding && project.titleOverlay?.enabled) {
+          const titleText = project.titleOverlay.useProjectName
+            ? (project.name || '')
+            : (project.titleOverlay.content || '');
+
+          if (titleText.trim().length > 0) {
+            ctx.save();
+            ctx.globalAlpha = transitionOpacity.contentOpacity;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'top';
+
+            // Background bar (optional)
+            if (project.titleOverlay.backgroundColor && project.titleOverlay.backgroundColor !== 'rgba(0,0,0,0)') {
+              ctx.fillStyle = project.titleOverlay.backgroundColor;
+              const boxH = project.titleOverlay.fontSize + 12;
+              const topY = project.titleOverlay.paddingY;
+              ctx.fillRect(0, topY - 6, width, boxH);
+            }
+
+            ctx.fillStyle = project.titleOverlay.color;
+            ctx.font = `bold ${project.titleOverlay.fontSize}px ${project.text.fontFamily}`;
+            ctx.fillText(titleText, width / 2, project.titleOverlay.paddingY);
+            ctx.restore();
+          }
+        }
+
         if (!scrollState.isEnding) {
           if (project.theme === 'reels') {
             // Reels theme: static lyrics with professional word-by-word highlight
@@ -371,8 +402,8 @@ export function useVideoExport() {
 
             const containerWidth = (width * project.text.containerWidth) / 100;
             let baseX = width / 2;
-            if (project.text.textAlign === 'left') baseX = (width - containerWidth) / 2 + scaledPaddingX;
-            if (project.text.textAlign === 'right') baseX = (width + containerWidth) / 2 - scaledPaddingX;
+            if (project.text.textAlign === 'left') baseX = (width - containerWidth) / 2 + effectivePaddingX;
+            if (project.text.textAlign === 'right') baseX = (width + containerWidth) / 2 - effectivePaddingX;
 
             // Parse highlight color
             const highlightColor = project.reels.highlightColor || '#FFD60A';
@@ -482,7 +513,9 @@ export function useVideoExport() {
             ctx.restore();
           } else if (project.theme === 'lyrics') {
             ctx.save();
-            ctx.globalAlpha = transitionOpacity.contentOpacity;
+            const lyricsOpacity = Math.max(0, Math.min(1, project.lyrics.textOpacity ?? 1));
+            const dimOpacity = Math.max(0, Math.min(1, project.lyrics.unhighlightedOpacity ?? 0.4));
+            ctx.globalAlpha = transitionOpacity.contentOpacity * lyricsOpacity;
             ctx.fillStyle = project.text.color;
             ctx.textAlign = project.text.textAlign;
             ctx.textBaseline = 'middle';
@@ -552,8 +585,8 @@ export function useVideoExport() {
             const fontPrefix = `${project.text.isItalic ? 'italic ' : ''}${project.text.isBold ? 'bold ' : ''}`;
             const containerWidth = (width * project.text.containerWidth) / 100;
             let x = width / 2;
-            if (project.text.textAlign === 'left') x = (width - containerWidth) / 2 + scaledPaddingX;
-            if (project.text.textAlign === 'right') x = (width + containerWidth) / 2 - scaledPaddingX;
+            if (project.text.textAlign === 'left') x = (width - containerWidth) / 2 + effectivePaddingX;
+            if (project.text.textAlign === 'right') x = (width + containerWidth) / 2 - effectivePaddingX;
 
             const safeHeight = Math.max(0, height - scaledPaddingY * 2);
             const centerY = scaledPaddingY + safeHeight / 2;
@@ -586,7 +619,7 @@ export function useVideoExport() {
               // Prev line
               if (displayLines[0]?.text) {
                 ctx.save();
-                ctx.globalAlpha = transitionOpacity.contentOpacity * 0.35;
+                ctx.globalAlpha = transitionOpacity.contentOpacity * lyricsOpacity * dimOpacity;
                 ctx.font = `${fontPrefix}${sideFont}px ${project.text.fontFamily}`;
                 ctx.fillText(displayLines[0].text, x, centerY - gap);
                 ctx.restore();
@@ -595,7 +628,7 @@ export function useVideoExport() {
               // Current line - base text
               const currText = displayLines[1]?.text || '';
               ctx.save();
-              ctx.globalAlpha = transitionOpacity.contentOpacity;
+              ctx.globalAlpha = transitionOpacity.contentOpacity * lyricsOpacity;
               ctx.font = `${fontPrefix}${activeFontSize * 1.04}px ${project.text.fontFamily}`;
               ctx.fillText(currText, x, centerY);
               ctx.restore();
@@ -609,12 +642,13 @@ export function useVideoExport() {
 
                 const wordWidths = words.map(w => ctx.measureText(w).width);
                 const spaceWidth = ctx.measureText(' ').width;
-                let totalWidth = wordWidths.reduce((a, b) => a + b, 0) + spaceWidth * (words.length - 1);
+                const wordGap = 4;
+                let totalWidth = wordWidths.reduce((a, b) => a + b, 0) + (spaceWidth + wordGap) * (words.length - 1);
                 
                 // Calculate clip width
                 let clipWidth = 0;
                 for (let i = 0; i < wordProgress.wordIndex; i++) {
-                  clipWidth += wordWidths[i] + spaceWidth;
+                  clipWidth += wordWidths[i] + spaceWidth + wordGap;
                 }
                 clipWidth += wordProgress.within * wordWidths[wordProgress.wordIndex];
 
@@ -645,7 +679,7 @@ export function useVideoExport() {
               // Next line
               if (displayLines[2]?.text) {
                 ctx.save();
-                ctx.globalAlpha = transitionOpacity.contentOpacity * 0.35;
+                ctx.globalAlpha = transitionOpacity.contentOpacity * lyricsOpacity * dimOpacity;
                 ctx.font = `${fontPrefix}${sideFont}px ${project.text.fontFamily}`;
                 ctx.fillText(displayLines[2].text, x, centerY + gap);
                 ctx.restore();
@@ -662,7 +696,7 @@ export function useVideoExport() {
                 const y = topY + i * lineGap;
 
                 ctx.save();
-                ctx.globalAlpha = transitionOpacity.contentOpacity * (isActive ? 1 : 0.35);
+                ctx.globalAlpha = transitionOpacity.contentOpacity * lyricsOpacity * (isActive ? 1 : dimOpacity);
                 ctx.font = `${fontPrefix}${fontSize}px ${project.text.fontFamily}`;
                 ctx.fillText(line.text, x, y);
                 ctx.restore();
@@ -678,11 +712,12 @@ export function useVideoExport() {
 
                   const wordWidths = words.map(w => ctx.measureText(w).width);
                   const spaceWidth = ctx.measureText(' ').width;
-                  let totalWidth = wordWidths.reduce((a, b) => a + b, 0) + spaceWidth * (words.length - 1);
+                  const wordGap = 4;
+                  let totalWidth = wordWidths.reduce((a, b) => a + b, 0) + (spaceWidth + wordGap) * (words.length - 1);
                   
                   let clipWidth = 0;
                   for (let j = 0; j < wordProgress.wordIndex; j++) {
-                    clipWidth += wordWidths[j] + spaceWidth;
+                    clipWidth += wordWidths[j] + spaceWidth + wordGap;
                   }
                   clipWidth += wordProgress.within * (wordWidths[wordProgress.wordIndex] || 0);
 
@@ -754,19 +789,38 @@ export function useVideoExport() {
             ctx.font = `${project.text.isItalic ? 'italic ' : ''}${project.text.isBold ? 'bold ' : ''}${scaledFontSize}px ${project.text.fontFamily}`;
             ctx.textAlign = project.text.textAlign;
             
-            // Apply letter spacing if needed
-            if (scaledSettings.letterSpacing !== 0) {
-              ctx.letterSpacing = `${scaledSettings.letterSpacing}px`;
+            // Apply letter spacing if supported
+            if ((ctx as any).letterSpacing !== undefined && scaledSettings.letterSpacing !== 0) {
+              (ctx as any).letterSpacing = `${scaledSettings.letterSpacing}px`;
             }
 
             const containerWidth = (width * project.text.containerWidth) / 100;
 
             let textX = width / 2;
-            if (project.text.textAlign === 'left') textX = (width - containerWidth) / 2 + scaledPaddingX;
-            if (project.text.textAlign === 'right') textX = (width + containerWidth) / 2 - scaledPaddingX;
+            if (project.text.textAlign === 'left') textX = (width - containerWidth) / 2 + effectivePaddingX;
+            if (project.text.textAlign === 'right') textX = (width + containerWidth) / 2 - effectivePaddingX;
 
             // Use unified scroll calculation - MATCHES PREVIEW EXACTLY
-            const scrollY = calculateScrollPosition(scrollState.progress, height, totalTextHeight);
+            let scrollY = calculateScrollPosition(scrollState.progress, height, totalTextHeight);
+
+            // Reserve space below title overlay so text never overlaps it
+            const titleTextForOffset = project.titleOverlay?.enabled
+              ? (project.titleOverlay.useProjectName ? (project.name || '') : (project.titleOverlay.content || ''))
+              : '';
+            const titleOffsetY = (project.titleOverlay?.enabled && titleTextForOffset.trim().length > 0)
+              ? Math.round(project.titleOverlay.paddingY + (project.titleOverlay.fontSize + 12) + 12)
+              : 0;
+            scrollY += titleOffsetY;
+
+            // For non-scrolling directions, honor vertical alignment preference
+            if (project.animation.direction !== 'up') {
+              const safeHeight = height;
+              const blockH = totalTextHeight;
+              if (project.text.verticalAlign === 'top') scrollY = 0;
+              else if (project.text.verticalAlign === 'bottom') scrollY = Math.max(0, safeHeight - blockH);
+              else scrollY = Math.max(0, (safeHeight - blockH) / 2);
+              scrollY += titleOffsetY;
+            }
 
             // Wave animation support
             if (project.text.waveAnimation) {

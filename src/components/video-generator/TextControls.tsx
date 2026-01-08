@@ -1,4 +1,4 @@
-import { Bold, Italic, AlignLeft, AlignCenter, AlignRight } from 'lucide-react';
+import { Bold, Italic, AlignLeft, AlignCenter, AlignRight, AlignVerticalJustifyStart, AlignVerticalJustifyCenter, AlignVerticalJustifyEnd } from 'lucide-react';
 import { TextSettings, FONT_FAMILIES } from '@/types/video-project';
 import { Textarea } from '@/components/ui/textarea';
 import { Slider } from '@/components/ui/slider';
@@ -104,6 +104,31 @@ export function TextControls({ settings, onChange }: TextControlsProps) {
               className={cn(
                 'flex-1 flex items-center justify-center py-2 rounded-lg border-2 transition-all',
                 settings.textAlign === value
+                  ? 'border-primary bg-primary/10 text-primary'
+                  : 'border-border bg-muted/50 text-muted-foreground hover:border-primary/50'
+              )}
+            >
+              <Icon className="w-4 h-4" />
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Vertical Alignment */}
+      <div className="space-y-2">
+        <label className="text-xs font-medium text-muted-foreground">Vertical</label>
+        <div className="flex gap-2">
+          {[
+            { value: 'top' as const, icon: AlignVerticalJustifyStart },
+            { value: 'center' as const, icon: AlignVerticalJustifyCenter },
+            { value: 'bottom' as const, icon: AlignVerticalJustifyEnd },
+          ].map(({ value, icon: Icon }) => (
+            <button
+              key={value}
+              onClick={() => onChange({ verticalAlign: value })}
+              className={cn(
+                'flex-1 flex items-center justify-center py-2 rounded-lg border-2 transition-all',
+                settings.verticalAlign === value
                   ? 'border-primary bg-primary/10 text-primary'
                   : 'border-border bg-muted/50 text-muted-foreground hover:border-primary/50'
               )}

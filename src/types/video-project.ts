@@ -5,6 +5,7 @@ export type LyricsTimingSource = 'estimate' | 'lrc';
 export type LyricsDisplayMode = 'lines' | 'paragraph' | 'pages' | 'full';
 export type ScrollDirection = 'up' | 'left' | 'right';
 export type TextAlign = 'left' | 'center' | 'right';
+export type VerticalAlign = 'top' | 'center' | 'bottom';
 export type ExportQuality = 'standard' | 'hd' | 'ultra';
 export type ExportFormat = 'mp4' | 'webm' | 'gif';
 export type WatermarkPosition = 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
@@ -23,11 +24,22 @@ export interface TextSettings {
   lineHeight: number;
   letterSpacing: number;
   textAlign: TextAlign;
+  verticalAlign: VerticalAlign;
   color: string;
   paddingX: number;
   paddingY: number;
   containerWidth: number;
   waveAnimation: boolean;
+}
+
+export interface TitleOverlaySettings {
+  enabled: boolean;
+  useProjectName: boolean;
+  content: string;
+  fontSize: number;
+  color: string;
+  backgroundColor: string;
+  paddingY: number;
 }
 
 export interface PagedTextPage {
@@ -117,6 +129,8 @@ export interface LyricsThemeSettings {
   charsPerSecond: number;
   minLineDuration: number;
   highlightLeadSeconds: number;
+  textOpacity: number;
+  unhighlightedOpacity: number;
   highlightIntensity: number;
   // Page-by-page karaoke settings
   linesPerPage: number;
@@ -178,6 +192,7 @@ export interface VideoProject {
   animation: AnimationSettings;
   audio: AudioSettings;
   watermark: WatermarkSettings;
+  titleOverlay: TitleOverlaySettings;
   overlay: OverlayTextSettings;
   ending: EndingSettings;
   createdAt: number;
@@ -249,6 +264,8 @@ export const DEFAULT_PROJECT: Omit<VideoProject, 'id' | 'createdAt' | 'updatedAt
     charsPerSecond: 14,
     minLineDuration: 1.4,
     highlightLeadSeconds: 0.08,
+    textOpacity: 1,
+    unhighlightedOpacity: 0.4,
     highlightIntensity: 0.85,
     linesPerPage: 4,
     pageTransitionDuration: 0.3,
@@ -287,6 +304,7 @@ export const DEFAULT_PROJECT: Omit<VideoProject, 'id' | 'createdAt' | 'updatedAt
     lineHeight: 1.6,
     letterSpacing: 0,
     textAlign: 'center',
+    verticalAlign: 'center',
     color: '#ffffff',
     paddingX: 18,
     paddingY: 40,
@@ -326,6 +344,15 @@ export const DEFAULT_PROJECT: Omit<VideoProject, 'id' | 'createdAt' | 'updatedAt
     size: 80,
     opacity: 80,
     padding: 16,
+  },
+  titleOverlay: {
+    enabled: false,
+    useProjectName: true,
+    content: '',
+    fontSize: 34,
+    color: '#ffffff',
+    backgroundColor: 'rgba(0,0,0,0)',
+    paddingY: 24,
   },
   overlay: {
     enabled: false,

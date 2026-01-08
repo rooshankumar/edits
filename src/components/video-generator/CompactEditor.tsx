@@ -2,6 +2,7 @@ import { useMemo, useState, useRef } from 'react';
 import { 
   Type, Palette, Sparkles, Music, ChevronDown, ChevronUp, 
   Bold, Italic, AlignLeft, AlignCenter, AlignRight,
+  AlignVerticalJustifyStart, AlignVerticalJustifyCenter, AlignVerticalJustifyEnd,
   ArrowUp, ArrowLeft, ArrowRight, RotateCcw, X, Image as ImageIcon, Film,
   Stamp, Layers, Flag, AlertTriangle, Maximize2
 } from 'lucide-react';
@@ -9,7 +10,7 @@ import {
   VideoProject, TextSettings, BackgroundSettings, AnimationSettings, AudioSettings,
   WatermarkSettings, OverlayTextSettings, EndingSettings,
   FONT_FAMILIES, CANVAS_SIZES, CanvasFormat, VideoTheme, LyricsPacingSource, LyricsThemeSettings, ReelsThemeSettings, WPMPreset, WPM_PRESETS,
-  LyricsTimingSource, LyricsDisplayMode
+  LyricsTimingSource, LyricsDisplayMode, TitleOverlaySettings
 } from '@/types/video-project';
 import { TimelineState, getWPMLevel } from '@/utils/timeline';
 import { getContentLengthCategory } from '@/utils/textScaling';
@@ -40,6 +41,7 @@ interface CompactEditorProps {
   onAnimationChange: (updates: Partial<AnimationSettings>) => void;
   onAudioChange: (updates: Partial<AudioSettings>) => void;
   onWatermarkChange: (updates: Partial<WatermarkSettings>) => void;
+  onTitleOverlayChange: (updates: Partial<TitleOverlaySettings>) => void;
   onOverlayChange: (updates: Partial<OverlayTextSettings>) => void;
   onEndingChange: (updates: Partial<EndingSettings>) => void;
 }
@@ -103,6 +105,7 @@ export function CompactEditor({
   onAnimationChange,
   onAudioChange,
   onWatermarkChange,
+  onTitleOverlayChange,
   onOverlayChange,
   onEndingChange,
 }: CompactEditorProps) {
@@ -356,6 +359,35 @@ export function CompactEditor({
                   </p>
                 </div>
 
+                <div>
+                  <label className="text-[10px] font-medium text-muted-foreground mb-1 block">
+                    Text opacity: {Math.round((project.lyrics.textOpacity ?? 1) * 100)}%
+                  </label>
+                  <Slider
+                    value={[project.lyrics.textOpacity ?? 1]}
+                    onValueChange={([v]) => onLyricsChange({ textOpacity: v })}
+                    min={0}
+                    max={1}
+                    step={0.05}
+                  />
+                </div>
+
+                <div>
+                  <label className="text-[10px] font-medium text-muted-foreground mb-1 block">
+                    Unhighlighted opacity: {Math.round((project.lyrics.unhighlightedOpacity ?? 0.4) * 100)}%
+                  </label>
+                  <Slider
+                    value={[project.lyrics.unhighlightedOpacity ?? 0.4]}
+                    onValueChange={([v]) => onLyricsChange({ unhighlightedOpacity: v })}
+                    min={0}
+                    max={1}
+                    step={0.05}
+                  />
+                  <p className="text-[9px] text-muted-foreground mt-1">
+                    Set to 100% to keep all words fully visible.
+                  </p>
+                </div>
+
                 {project.lyrics.autoFitLrcToAudio && (
                   <div className="text-[9px] text-muted-foreground">
                     {project.audio.file ? (
@@ -453,6 +485,35 @@ export function CompactEditor({
                   max={1}
                   step={0.05}
                 />
+              </div>
+
+              <div>
+                <label className="text-[10px] font-medium text-muted-foreground mb-1 block">
+                  Text opacity: {Math.round((project.lyrics.textOpacity ?? 1) * 100)}%
+                </label>
+                <Slider
+                  value={[project.lyrics.textOpacity ?? 1]}
+                  onValueChange={([v]) => onLyricsChange({ textOpacity: v })}
+                  min={0}
+                  max={1}
+                  step={0.05}
+                />
+              </div>
+
+              <div>
+                <label className="text-[10px] font-medium text-muted-foreground mb-1 block">
+                  Unhighlighted opacity: {Math.round((project.lyrics.unhighlightedOpacity ?? 0.4) * 100)}%
+                </label>
+                <Slider
+                  value={[project.lyrics.unhighlightedOpacity ?? 0.4]}
+                  onValueChange={([v]) => onLyricsChange({ unhighlightedOpacity: v })}
+                  min={0}
+                  max={1}
+                  step={0.05}
+                />
+                <p className="text-[9px] text-muted-foreground mt-1">
+                  Set to 100% to keep all words fully visible.
+                </p>
               </div>
             </div>
           </div>
@@ -928,6 +989,24 @@ export function CompactEditor({
                 </button>
               ))}
             </div>
+            <div className="mt-1.5 flex gap-1">
+              {[
+                { value: 'top' as const, icon: AlignVerticalJustifyStart },
+                { value: 'center' as const, icon: AlignVerticalJustifyCenter },
+                { value: 'bottom' as const, icon: AlignVerticalJustifyEnd },
+              ].map(({ value, icon: Icon }) => (
+                <button
+                  key={value}
+                  onClick={() => onTextChange({ verticalAlign: value })}
+                  className={cn(
+                    'flex-1 flex items-center justify-center py-1.5 border transition-all excel-hover',
+                    project.text.verticalAlign === value ? 'border-primary bg-excel-selected border-2' : 'border-border'
+                  )}
+                >
+                  <Icon className="w-3 h-3" />
+                </button>
+              ))}
+            </div>
           </div>
 
           {/* Color */}
@@ -1222,6 +1301,97 @@ export function CompactEditor({
         {/* WATERMARK Section */}
         <Section title="Watermark" icon={<Stamp className="w-3 h-3" />} defaultOpen={false} badge={project.watermark.enabled ? 'ON' : undefined}>
           <WatermarkControls settings={project.watermark} onChange={onWatermarkChange} />
+        </Section>
+
+        {/* TITLE Section */}
+        <Section title="Title" icon={<Type className="w-3 h-3" />} defaultOpen={false} badge={project.titleOverlay.enabled ? 'ON' : undefined}>
+          <div className="space-y-2">
+            <div className="flex items-center justify-between px-3 py-2 border border-border excel-hover">
+              <span className="text-xs font-semibold">Top Title</span>
+              <Switch
+                checked={project.titleOverlay.enabled}
+                onCheckedChange={(checked) => onTitleOverlayChange({ enabled: checked })}
+              />
+            </div>
+
+            {project.titleOverlay.enabled && (
+              <div className="border border-border bg-card">
+                <div className="px-3 py-2 border-b border-border">
+                  <div className="flex items-center justify-between">
+                    <label className="text-[10px] font-medium text-muted-foreground">Use Project Name</label>
+                    <Switch
+                      checked={project.titleOverlay.useProjectName}
+                      onCheckedChange={(checked) => onTitleOverlayChange({ useProjectName: checked })}
+                    />
+                  </div>
+                </div>
+
+                {!project.titleOverlay.useProjectName && (
+                  <div className="px-3 py-2 border-b border-border">
+                    <label className="text-[10px] font-medium text-muted-foreground mb-1 block">Title Text</label>
+                    <Input
+                      value={project.titleOverlay.content}
+                      onChange={(e) => onTitleOverlayChange({ content: e.target.value })}
+                      placeholder="Enter title..."
+                      className="h-7 text-xs border-border"
+                    />
+                  </div>
+                )}
+
+                <div className="px-3 py-2 border-b border-border">
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-[10px] font-medium text-muted-foreground">Font Size</label>
+                    <span className="text-[10px] font-semibold">{project.titleOverlay.fontSize}px</span>
+                  </div>
+                  <Slider
+                    value={[project.titleOverlay.fontSize]}
+                    onValueChange={([v]) => onTitleOverlayChange({ fontSize: v })}
+                    min={14}
+                    max={96}
+                    step={2}
+                  />
+                </div>
+
+                <div className="px-3 py-2 border-b border-border">
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-[10px] font-medium text-muted-foreground">Top Padding</label>
+                    <span className="text-[10px] font-semibold">{project.titleOverlay.paddingY}px</span>
+                  </div>
+                  <Slider
+                    value={[project.titleOverlay.paddingY]}
+                    onValueChange={([v]) => onTitleOverlayChange({ paddingY: v })}
+                    min={0}
+                    max={120}
+                    step={2}
+                  />
+                </div>
+
+                <div className="px-3 py-2">
+                  <label className="text-[10px] font-medium text-muted-foreground mb-2 block">Colors</label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="text-[10px] text-muted-foreground block mb-1">Text</label>
+                      <input
+                        type="color"
+                        value={project.titleOverlay.color}
+                        onChange={(e) => onTitleOverlayChange({ color: e.target.value })}
+                        className="w-full h-7 border border-border cursor-pointer"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-muted-foreground block mb-1">Background</label>
+                      <input
+                        type="color"
+                        value={project.titleOverlay.backgroundColor.startsWith('rgba') ? '#000000' : project.titleOverlay.backgroundColor}
+                        onChange={(e) => onTitleOverlayChange({ backgroundColor: e.target.value + '00' })}
+                        className="w-full h-7 border border-border cursor-pointer"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
         </Section>
 
         {/* OVERLAY Section */}

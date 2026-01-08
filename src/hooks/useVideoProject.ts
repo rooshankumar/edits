@@ -2,7 +2,7 @@ import { useState, useCallback, useEffect } from 'react';
 import {
   VideoProject, DEFAULT_PROJECT, CanvasFormat,
   TextSettings, BackgroundSettings, AnimationSettings, AudioSettings,
-  WatermarkSettings, OverlayTextSettings, EndingSettings, LyricsThemeSettings, ReelsThemeSettings,
+  WatermarkSettings, OverlayTextSettings, EndingSettings, LyricsThemeSettings, ReelsThemeSettings, TitleOverlaySettings,
   calculateDurationFromWPM, calculateWPMFromDuration, WPM_PRESETS
 } from '@/types/video-project';
 import { parseKaraokeLrc } from '@/utils/karaokeLrc';
@@ -93,6 +93,7 @@ export function useVideoProject() {
           audio: { ...DEFAULT_PROJECT.audio, ...parsed.audio },
           animation: { ...DEFAULT_PROJECT.animation, ...parsed.animation },
           watermark: { ...DEFAULT_PROJECT.watermark, ...parsed.watermark },
+          titleOverlay: { ...DEFAULT_PROJECT.titleOverlay, ...parsed.titleOverlay },
           overlay: { ...DEFAULT_PROJECT.overlay, ...parsed.overlay },
           ending: { ...DEFAULT_PROJECT.ending, ...parsed.ending },
           id: parsed.id || generateId(),
@@ -115,7 +116,25 @@ export function useVideoProject() {
     const saved = localStorage.getItem(STORAGE_KEY);
     if (saved) {
       try {
-        return JSON.parse(saved);
+        const parsed = JSON.parse(saved);
+        if (!Array.isArray(parsed)) return [];
+        return parsed.map((p: any) => ({
+          ...DEFAULT_PROJECT,
+          ...p,
+          lyrics: { ...DEFAULT_PROJECT.lyrics, ...p.lyrics },
+          reels: { ...DEFAULT_PROJECT.reels, ...p.reels },
+          text: { ...DEFAULT_PROJECT.text, ...p.text },
+          pagedText: { ...DEFAULT_PROJECT.pagedText, ...p.pagedText },
+          audio: { ...DEFAULT_PROJECT.audio, ...p.audio },
+          animation: { ...DEFAULT_PROJECT.animation, ...p.animation },
+          watermark: { ...DEFAULT_PROJECT.watermark, ...p.watermark },
+          titleOverlay: { ...DEFAULT_PROJECT.titleOverlay, ...p.titleOverlay },
+          overlay: { ...DEFAULT_PROJECT.overlay, ...p.overlay },
+          ending: { ...DEFAULT_PROJECT.ending, ...p.ending },
+          id: p.id || generateId(),
+          createdAt: p.createdAt || Date.now(),
+          updatedAt: p.updatedAt || Date.now(),
+        }));
       } catch {
         // ignore
       }
@@ -272,6 +291,14 @@ export function useVideoProject() {
     }));
   }, []);
 
+  const updateTitleOverlay = useCallback((updates: Partial<TitleOverlaySettings>) => {
+    setProject(prev => ({
+      ...prev,
+      titleOverlay: { ...prev.titleOverlay, ...updates },
+      updatedAt: Date.now(),
+    }));
+  }, []);
+
   const updateEnding = useCallback((updates: Partial<EndingSettings>) => {
     setProject(prev => ({
       ...prev,
@@ -321,6 +348,7 @@ export function useVideoProject() {
         audio: { ...DEFAULT_PROJECT.audio, ...found.audio },
         animation: { ...DEFAULT_PROJECT.animation, ...found.animation },
         watermark: { ...DEFAULT_PROJECT.watermark, ...found.watermark },
+        titleOverlay: { ...DEFAULT_PROJECT.titleOverlay, ...found.titleOverlay },
         overlay: { ...DEFAULT_PROJECT.overlay, ...found.overlay },
         ending: { ...DEFAULT_PROJECT.ending, ...found.ending },
       }));
@@ -361,6 +389,7 @@ export function useVideoProject() {
     updateAnimation,
     updateAudio,
     updateWatermark,
+    updateTitleOverlay,
     updateOverlay,
     updateEnding,
     setCanvasFormat,

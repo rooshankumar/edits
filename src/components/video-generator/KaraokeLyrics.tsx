@@ -135,6 +135,8 @@ export const KaraokeLyrics = ({
     isHighlighted: boolean,
     wordWithin: number
   ) => {
+    const baseDim = project.lyrics.unhighlightedOpacity ?? 0.4;
+    const safeDim = Math.max(0, Math.min(1, baseDim));
     const highlightBgOpacity = Math.min(1, 0.12 + project.lyrics.highlightIntensity * 0.45);
     
     // Determine highlight style
@@ -164,7 +166,7 @@ export const KaraokeLyrics = ({
       <span
         key={wordIdx}
         style={{
-          opacity: isHighlighted ? 1 : 0.4,
+          opacity: (isHighlighted ? 1 : safeDim) * (project.lyrics.textOpacity ?? 1),
           transition: 'opacity 0.15s ease',
           display: 'inline',
           ...bgStyle,
@@ -173,7 +175,7 @@ export const KaraokeLyrics = ({
         {word}
       </span>
     );
-  }, [highlightRgb, project.lyrics.highlightIntensity, project.lyrics.wordHighlightStyle]);
+  }, [highlightRgb, project.lyrics.highlightIntensity, project.lyrics.textOpacity, project.lyrics.unhighlightedOpacity, project.lyrics.wordHighlightStyle]);
 
   // Render a line with word-level highlighting
   const renderLine = useCallback((
@@ -182,6 +184,8 @@ export const KaraokeLyrics = ({
     isActiveLine: boolean,
     fontSize: number
   ) => {
+    const baseDim = project.lyrics.unhighlightedOpacity ?? 0.4;
+    const safeDim = Math.max(0, Math.min(1, baseDim));
     const words = lineText.trim().split(/\s+/).filter(Boolean);
     
     // Get word tokens from LRC if available
@@ -200,7 +204,7 @@ export const KaraokeLyrics = ({
           ...commonStyle,
           fontSize: `${fontSize}px`,
           lineHeight: scaledLineHeight,
-          opacity: isActiveLine ? transitionOpacity : transitionOpacity * 0.35,
+          opacity: isActiveLine ? transitionOpacity : transitionOpacity * safeDim,
           transition: `opacity ${project.lyrics.pageTransitionDuration}s ease`,
         }}
         className="text-center"
@@ -220,7 +224,7 @@ export const KaraokeLyrics = ({
         )}
       </div>
     );
-  }, [commonStyle, karaokeLrc, project.lyrics, project.text.waveAnimation, renderWord, scaledLineHeight, transitionOpacity, wordProgress]);
+  }, [commonStyle, karaokeLrc, project.lyrics.pageTransitionDuration, project.lyrics.timingSource, project.lyrics.unhighlightedOpacity, project.text.waveAnimation, renderWord, scaledLineHeight, transitionOpacity, wordProgress]);
 
   // Calculate font sizes
   const baseFontSize = scaledFontSize * 0.9;
@@ -273,7 +277,7 @@ export const KaraokeLyrics = ({
         paddingBottom: `${scaledPaddingY}px`,
         paddingLeft: `${scaledPaddingX}px`,
         paddingRight: `${scaledPaddingX}px`,
-        opacity: transitionOpacity,
+        opacity: transitionOpacity * (project.lyrics.textOpacity ?? 1),
         transition: `opacity ${project.lyrics.pageTransitionDuration}s ease`,
       }}
     >
@@ -281,13 +285,13 @@ export const KaraokeLyrics = ({
         // Lines mode: prev / current / next
         <div className="flex flex-col items-center gap-3 w-full">
           {displayLines[0]?.text && (
-            <div style={{ ...commonStyle, opacity: 0.35, fontSize: `${scaledFontSize * 0.7}px`, lineHeight: scaledLineHeight }}>
+            <div style={{ ...commonStyle, opacity: (project.lyrics.unhighlightedOpacity ?? 0.4) * 0.875, fontSize: `${scaledFontSize * 0.7}px`, lineHeight: scaledLineHeight }}>
               {displayLines[0].text}
             </div>
           )}
           {renderLine(displayLines[1]?.text || '', displayLines[1]?.originalIndex ?? activeLineIndex, true, scaledFontSize * 1.25)}
           {displayLines[2]?.text && (
-            <div style={{ ...commonStyle, opacity: 0.35, fontSize: `${scaledFontSize * 0.7}px`, lineHeight: scaledLineHeight }}>
+            <div style={{ ...commonStyle, opacity: (project.lyrics.unhighlightedOpacity ?? 0.4) * 0.875, fontSize: `${scaledFontSize * 0.7}px`, lineHeight: scaledLineHeight }}>
               {displayLines[2].text}
             </div>
           )}
