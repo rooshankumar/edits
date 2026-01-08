@@ -140,6 +140,25 @@ export function KaraokeLyricsCanvas(props: KaraokeLyricsCanvasProps) {
 
       ctx.clearRect(0, 0, computed.width, computed.height);
 
+      const invertColor = (color: string): string => {
+        const raw = (color || '').trim();
+        const hex = raw.startsWith('#') ? raw.slice(1) : raw;
+        const full = hex.length === 3
+          ? `${hex[0]}${hex[0]}${hex[1]}${hex[1]}${hex[2]}${hex[2]}`
+          : hex;
+        if (!/^[0-9a-fA-F]{6}$/.test(full)) {
+          return '#000000';
+        }
+        const r = 255 - parseInt(full.slice(0, 2), 16);
+        const g = 255 - parseInt(full.slice(2, 4), 16);
+        const b = 255 - parseInt(full.slice(4, 6), 16);
+        return `rgb(${r}, ${g}, ${b})`;
+      };
+
+      const highlightTextColor = project.lyrics.invertHighlightTextColor
+        ? invertColor(project.text.color)
+        : project.text.color;
+
       ctx.save();
       ctx.globalAlpha = transitionOpacity * computed.lyricsOpacity;
       ctx.fillStyle = project.text.color;
@@ -165,6 +184,7 @@ export function KaraokeLyricsCanvas(props: KaraokeLyricsCanvasProps) {
       ctx.save();
       ctx.globalAlpha = transitionOpacity * computed.lyricsOpacity;
       ctx.font = `${computed.fontPrefix}${computed.activeFontSize * 1.04}px ${project.text.fontFamily}`;
+      ctx.fillStyle = highlightTextColor;
       ctx.fillText(currText, px(computed.x), px(computed.centerY));
       ctx.restore();
 
@@ -216,6 +236,7 @@ export function KaraokeLyricsCanvas(props: KaraokeLyricsCanvasProps) {
         ctx.save();
         ctx.globalAlpha = transitionOpacity * computed.lyricsOpacity * (isActive ? 1 : computed.dimOpacity);
         ctx.font = `${computed.fontPrefix}${fontSize}px ${project.text.fontFamily}`;
+        ctx.fillStyle = isActive ? highlightTextColor : project.text.color;
         ctx.fillText(line.text, px(computed.x), px(y));
         ctx.restore();
 

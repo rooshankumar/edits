@@ -327,6 +327,17 @@ export function CompactEditor({
                   />
                 </div>
 
+                <div className="flex items-center justify-between">
+                  <div>
+                    <label className="text-[10px] font-medium text-muted-foreground mb-1 block">Invert highlighted text color</label>
+                    <p className="text-[9px] text-muted-foreground">Inverts the active line color for better contrast</p>
+                  </div>
+                  <Switch
+                    checked={project.lyrics.invertHighlightTextColor ?? false}
+                    onCheckedChange={(checked) => onLyricsChange({ invertHighlightTextColor: checked })}
+                  />
+                </div>
+
                 <div>
                   <label className="text-[10px] font-medium text-muted-foreground mb-1 block">
                     LRC offset: {project.lyrics.lrcOffsetSeconds.toFixed(2)}s
@@ -474,6 +485,18 @@ export function CompactEditor({
                   />
                 </div>
               )}
+
+              <div className="flex items-center justify-between col-span-2">
+                <div>
+                  <label className="text-[10px] font-medium text-muted-foreground mb-1 block">Invert highlighted text color</label>
+                  <p className="text-[9px] text-muted-foreground">Inverts the active line color for better contrast</p>
+                </div>
+                <Switch
+                  checked={project.lyrics.invertHighlightTextColor ?? false}
+                  onCheckedChange={(checked) => onLyricsChange({ invertHighlightTextColor: checked })}
+                />
+              </div>
+
               <div>
                 <label className="text-[10px] font-medium text-muted-foreground mb-1 block">
                   Highlight intensity: {project.lyrics.highlightIntensity.toFixed(2)}

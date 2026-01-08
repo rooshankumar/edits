@@ -516,6 +516,23 @@ export function useVideoExport() {
             const lyricsOpacity = Math.max(0, Math.min(1, project.lyrics.textOpacity ?? 1));
             const dimOpacity = Math.max(0, Math.min(1, project.lyrics.unhighlightedOpacity ?? 0.4));
             ctx.globalAlpha = transitionOpacity.contentOpacity * lyricsOpacity;
+            const invertColor = (color: string): string => {
+              const raw = (color || '').trim();
+              const hex = raw.startsWith('#') ? raw.slice(1) : raw;
+              const full = hex.length === 3
+                ? `${hex[0]}${hex[0]}${hex[1]}${hex[1]}${hex[2]}${hex[2]}`
+                : hex;
+              if (!/^[0-9a-fA-F]{6}$/.test(full)) return '#000000';
+              const r = 255 - parseInt(full.slice(0, 2), 16);
+              const g = 255 - parseInt(full.slice(2, 4), 16);
+              const b = 255 - parseInt(full.slice(4, 6), 16);
+              return `rgb(${r}, ${g}, ${b})`;
+            };
+
+            const highlightTextColor = project.lyrics.invertHighlightTextColor
+              ? invertColor(project.text.color)
+              : project.text.color;
+
             ctx.fillStyle = project.text.color;
             ctx.textAlign = project.text.textAlign;
             ctx.textBaseline = 'middle';
@@ -621,6 +638,7 @@ export function useVideoExport() {
                 ctx.save();
                 ctx.globalAlpha = transitionOpacity.contentOpacity * lyricsOpacity * dimOpacity;
                 ctx.font = `${fontPrefix}${sideFont}px ${project.text.fontFamily}`;
+                ctx.fillStyle = project.text.color;
                 ctx.fillText(displayLines[0].text, x, centerY - gap);
                 ctx.restore();
               }
@@ -630,6 +648,7 @@ export function useVideoExport() {
               ctx.save();
               ctx.globalAlpha = transitionOpacity.contentOpacity * lyricsOpacity;
               ctx.font = `${fontPrefix}${activeFontSize * 1.04}px ${project.text.fontFamily}`;
+              ctx.fillStyle = highlightTextColor;
               ctx.fillText(currText, x, centerY);
               ctx.restore();
 
@@ -681,6 +700,7 @@ export function useVideoExport() {
                 ctx.save();
                 ctx.globalAlpha = transitionOpacity.contentOpacity * lyricsOpacity * dimOpacity;
                 ctx.font = `${fontPrefix}${sideFont}px ${project.text.fontFamily}`;
+                ctx.fillStyle = project.text.color;
                 ctx.fillText(displayLines[2].text, x, centerY + gap);
                 ctx.restore();
               }
@@ -698,6 +718,7 @@ export function useVideoExport() {
                 ctx.save();
                 ctx.globalAlpha = transitionOpacity.contentOpacity * lyricsOpacity * (isActive ? 1 : dimOpacity);
                 ctx.font = `${fontPrefix}${fontSize}px ${project.text.fontFamily}`;
+                ctx.fillStyle = isActive ? highlightTextColor : project.text.color;
                 ctx.fillText(line.text, x, y);
                 ctx.restore();
 

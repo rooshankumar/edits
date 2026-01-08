@@ -131,6 +131,7 @@ export interface LyricsThemeSettings {
   highlightLeadSeconds: number;
   textOpacity: number;
   unhighlightedOpacity: number;
+  invertHighlightTextColor: boolean;
   highlightIntensity: number;
   // Page-by-page karaoke settings
   linesPerPage: number;
@@ -261,14 +262,15 @@ export const DEFAULT_PROJECT: Omit<VideoProject, 'id' | 'createdAt' | 'updatedAt
     lrcOffsetSeconds: 0,
     highlightBgColor: '#FFD60A',
     pacingSource: 'chars',
-    charsPerSecond: 14,
-    minLineDuration: 1.4,
+    charsPerSecond: 12,
+    minLineDuration: 0.8,
     highlightLeadSeconds: 0.08,
     textOpacity: 1,
     unhighlightedOpacity: 0.4,
+    invertHighlightTextColor: false,
     highlightIntensity: 0.85,
-    linesPerPage: 4,
-    pageTransitionDuration: 0.3,
+    linesPerPage: 3,
+    pageTransitionDuration: 0.35,
     wordHighlightStyle: 'sweep',
     showProgressBar: true,
   },
