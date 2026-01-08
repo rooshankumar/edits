@@ -322,7 +322,7 @@ export function useVideoExport() {
 
         if (!scrollState.isEnding) {
           if (project.theme === 'reels') {
-            // Reels theme: static lyrics with word-by-word highlight
+            // Reels theme: static lyrics with professional word-by-word highlight
             ctx.save();
             ctx.globalAlpha = transitionOpacity.contentOpacity;
             ctx.fillStyle = project.text.color;
@@ -361,7 +361,13 @@ export function useVideoExport() {
 
             const lineHeight = scaledFontSize * project.text.lineHeight;
             const totalHeight = (endIdx - startIdx) * lineHeight;
-            const startY = (height - totalHeight) / 2 + lineHeight / 2;
+            
+            // Kinetic offset
+            const kineticOffset = project.reels.kinetic 
+              ? (currentTimeSec / safeContentDurationStatic) * project.reels.kineticSpeed * height * 0.1
+              : 0;
+            
+            const startY = (height - totalHeight) / 2 + lineHeight / 2 - kineticOffset;
 
             const containerWidth = (width * project.text.containerWidth) / 100;
             let baseX = width / 2;
@@ -370,6 +376,22 @@ export function useVideoExport() {
 
             // Parse highlight color
             const highlightColor = project.reels.highlightColor || '#FFD60A';
+            const highlightRgb = (() => {
+              const hex = highlightColor.startsWith('#') ? highlightColor.slice(1) : highlightColor;
+              const full = hex.length === 3 ? `${hex[0]}${hex[0]}${hex[1]}${hex[1]}${hex[2]}${hex[2]}` : hex;
+              return {
+                r: parseInt(full.slice(0, 2), 16),
+                g: parseInt(full.slice(2, 4), 16),
+                b: parseInt(full.slice(4, 6), 16),
+              };
+            })();
+
+            // Text shadow setup
+            if (project.reels.textShadow) {
+              ctx.shadowColor = `rgba(0, 0, 0, ${project.reels.textShadowOpacity})`;
+              ctx.shadowBlur = project.reels.textShadowBlur;
+              ctx.shadowOffsetY = project.reels.textShadowBlur * 0.4;
+            }
 
             for (let i = startIdx; i < endIdx; i++) {
               const y = startY + (i - startIdx) * lineHeight;
@@ -392,24 +414,71 @@ export function useVideoExport() {
                   const spaceWidth = ctx.measureText(' ').width;
                   const isHighlighted = wIdx <= wordProgress.wordIndex;
 
-                  if (isHighlighted) {
-                    ctx.fillStyle = highlightColor;
-                    ctx.fillRect(wordX - 2, y - scaledFontSize * 0.4, wordWidth + 4, scaledFontSize * 0.8);
+                  ctx.save();
+                  
+                  if (project.reels.highlightType === 'glow') {
+                    // Glow effect
+                    if (isHighlighted) {
+                      ctx.shadowColor = highlightColor;
+                      ctx.shadowBlur = project.reels.glowIntensity;
+                      ctx.fillStyle = project.text.color;
+                      ctx.globalAlpha = 1;
+                      // Draw twice for stronger glow
+                      ctx.fillText(word, wordX, y);
+                      ctx.fillText(word, wordX, y);
+                    } else {
+                      ctx.fillStyle = project.text.color;
+                      ctx.globalAlpha = project.reels.unhighlightedOpacity * 0.7;
+                      ctx.fillText(word, wordX, y);
+                    }
+                  } else if (project.reels.highlightType === 'color-change') {
+                    // Color change effect
+                    ctx.fillStyle = isHighlighted ? highlightColor : project.text.color;
+                    ctx.globalAlpha = isHighlighted ? 1 : project.reels.unhighlightedOpacity;
+                    ctx.fillText(word, wordX, y);
+                  } else {
+                    // Sweep effect (default)
+                    if (isHighlighted) {
+                      // Draw highlight background
+                      ctx.shadowBlur = 0;
+                      ctx.fillStyle = highlightColor;
+                      ctx.fillRect(wordX - 4, y - scaledFontSize * 0.45, wordWidth + 8, scaledFontSize * 0.9);
+                    }
+                    ctx.fillStyle = project.text.color;
+                    ctx.globalAlpha = isHighlighted ? 1 : project.reels.unhighlightedOpacity;
+                    ctx.fillText(word, wordX, y);
                   }
-
-                  ctx.fillStyle = project.text.color;
-                  ctx.globalAlpha = isHighlighted ? 1 : project.reels.unhighlightedOpacity;
-                  ctx.fillText(word, wordX, y);
+                  
+                  ctx.restore();
                   ctx.globalAlpha = 1;
                   wordX += wordWidth + spaceWidth;
                 });
                 ctx.restore();
               } else {
                 ctx.globalAlpha = isPast ? 1 : project.reels.unhighlightedOpacity;
+                if (project.reels.highlightType === 'glow' && isPast) {
+                  ctx.shadowColor = highlightColor;
+                  ctx.shadowBlur = project.reels.glowIntensity * 0.5;
+                }
                 ctx.fillText(text, baseX, y);
                 ctx.globalAlpha = 1;
               }
             }
+            
+            // Draw vignette
+            if (project.reels.vignette) {
+              ctx.restore();
+              ctx.save();
+              const gradient = ctx.createRadialGradient(
+                width / 2, height / 2, 0,
+                width / 2, height / 2, Math.max(width, height) * 0.7
+              );
+              gradient.addColorStop(0.4, 'transparent');
+              gradient.addColorStop(1, `rgba(0, 0, 0, ${project.reels.vignetteIntensity})`);
+              ctx.fillStyle = gradient;
+              ctx.fillRect(0, 0, width, height);
+            }
+            
             ctx.restore();
           } else if (project.theme === 'lyrics') {
             ctx.save();

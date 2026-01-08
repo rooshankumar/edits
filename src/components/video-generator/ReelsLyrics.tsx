@@ -1,7 +1,6 @@
 import { useMemo } from 'react';
 import { VideoProject, CANVAS_SIZES } from '@/types/video-project';
 import { parseKaraokeLrc, scaleKaraokeLrc, findActiveKaraokeLineIndex, findKaraokeWordProgress, getEstimatedWordProgress } from '@/utils/karaokeLrc';
-import { cn } from '@/lib/utils';
 
 interface ReelsLyricsProps {
   project: VideoProject;
@@ -117,8 +116,84 @@ export function ReelsLyrics({ project, currentTime, contentDuration, scaleFactor
     return baseSize * (aspectRatio > 1 ? 1.1 : 0.9);
   }, [project.text.fontSize, scaleFactor, canvasSize]);
 
+  // Calculate kinetic offset
+  const kineticOffset = useMemo(() => {
+    if (!project.reels.kinetic) return 0;
+    const progress = contentDuration > 0 ? currentTime / contentDuration : 0;
+    // Gentle upward drift
+    return progress * project.reels.kineticSpeed * 100 * scaleFactor;
+  }, [project.reels.kinetic, project.reels.kineticSpeed, currentTime, contentDuration, scaleFactor]);
+
   const highlightColor = project.reels.highlightColor;
   const unhighlightedOpacity = project.reels.unhighlightedOpacity;
+  
+  // Easing function for CSS
+  const easingCurve = useMemo(() => {
+    switch (project.reels.easingType) {
+      case 'ease-in-out': return 'cubic-bezier(0.4, 0, 0.2, 1)';
+      case 'spring': return 'cubic-bezier(0.34, 1.56, 0.64, 1)';
+      default: return 'linear';
+    }
+  }, [project.reels.easingType]);
+
+  // Text shadow style
+  const textShadowStyle = useMemo(() => {
+    if (!project.reels.textShadow) return 'none';
+    const blur = project.reels.textShadowBlur * scaleFactor;
+    const opacity = project.reels.textShadowOpacity;
+    return `0 ${blur * 0.4}px ${blur}px rgba(0, 0, 0, ${opacity})`;
+  }, [project.reels.textShadow, project.reels.textShadowBlur, project.reels.textShadowOpacity, scaleFactor]);
+
+  // Get highlight styles based on type
+  const getWordStyle = (isHighlighted: boolean, isCurrentWord: boolean, wordWithin: number): React.CSSProperties => {
+    const baseStyle: React.CSSProperties = {
+      display: 'inline-block',
+      padding: '2px 6px',
+      borderRadius: `${4 * scaleFactor}px`,
+      transitionProperty: 'all',
+      transitionDuration: `${project.reels.wordTransitionSpeed}s`,
+      transitionTimingFunction: easingCurve,
+    };
+
+    switch (project.reels.highlightType) {
+      case 'glow':
+        return {
+          ...baseStyle,
+          color: project.text.color,
+          opacity: isHighlighted ? 1 : unhighlightedOpacity,
+          filter: isHighlighted 
+            ? `brightness(1.3) drop-shadow(0 0 ${project.reels.glowIntensity * scaleFactor}px ${highlightColor})`
+            : 'brightness(0.7)',
+          textShadow: isHighlighted 
+            ? `0 0 ${project.reels.glowIntensity * scaleFactor}px ${highlightColor}, 0 0 ${project.reels.glowIntensity * 2 * scaleFactor}px ${highlightColor}`
+            : textShadowStyle,
+        };
+
+      case 'color-change':
+        return {
+          ...baseStyle,
+          color: isHighlighted ? highlightColor : project.text.color,
+          opacity: isHighlighted ? 1 : unhighlightedOpacity,
+          textShadow: textShadowStyle,
+        };
+
+      case 'sweep':
+      default:
+        const bgStyle: React.CSSProperties = {};
+        if (isCurrentWord) {
+          bgStyle.background = `linear-gradient(90deg, ${highlightColor} ${wordWithin * 100}%, transparent ${wordWithin * 100}%)`;
+        } else if (isHighlighted) {
+          bgStyle.background = highlightColor;
+        }
+        return {
+          ...baseStyle,
+          ...bgStyle,
+          color: project.text.color,
+          opacity: isHighlighted ? 1 : unhighlightedOpacity,
+          textShadow: textShadowStyle,
+        };
+    }
+  };
 
   return (
     <div 
@@ -127,8 +202,18 @@ export function ReelsLyrics({ project, currentTime, contentDuration, scaleFactor
         padding: `${project.text.paddingY * scaleFactor}px ${project.text.paddingX * scaleFactor}px`,
       }}
     >
+      {/* Vignette overlay */}
+      {project.reels.vignette && (
+        <div 
+          className="absolute inset-0 pointer-events-none z-10"
+          style={{
+            background: `radial-gradient(ellipse at center, transparent 40%, rgba(0, 0, 0, ${project.reels.vignetteIntensity}) 100%)`,
+          }}
+        />
+      )}
+
       <div 
-        className="flex flex-col items-center gap-2"
+        className="flex flex-col items-center gap-2 relative z-0"
         style={{
           width: `${project.text.containerWidth}%`,
           fontFamily: project.text.fontFamily,
@@ -138,6 +223,8 @@ export function ReelsLyrics({ project, currentTime, contentDuration, scaleFactor
           lineHeight: project.text.lineHeight,
           letterSpacing: `${project.text.letterSpacing * scaleFactor}px`,
           textAlign: project.text.textAlign,
+          transform: `translateY(-${kineticOffset}px)`,
+          transition: `transform 0.1s ${easingCurve}`,
         }}
       >
         {visibleLines.map((line, lineIdx) => {
@@ -150,9 +237,11 @@ export function ReelsLyrics({ project, currentTime, contentDuration, scaleFactor
           return (
             <div 
               key={line.originalIndex}
-              className="transition-opacity duration-300"
               style={{
                 opacity: isActiveLine ? 1 : (isPastLine ? 1 : unhighlightedOpacity),
+                transitionProperty: 'opacity',
+                transitionDuration: `${project.reels.lineTransitionSpeed}s`,
+                transitionTimingFunction: easingCurve,
               }}
             >
               {words.map((segment, segIdx) => {
@@ -180,28 +269,10 @@ export function ReelsLyrics({ project, currentTime, contentDuration, scaleFactor
                   wordWithin = wordProgress.within;
                 }
                 
-                // Determine background style
-                const bgStyle: React.CSSProperties = {};
-                
-                if (isCurrentWord) {
-                  // Sweep highlight for current word
-                  bgStyle.background = `linear-gradient(90deg, ${highlightColor} ${wordWithin * 100}%, transparent ${wordWithin * 100}%)`;
-                } else if (isHighlighted) {
-                  bgStyle.background = highlightColor;
-                }
-                
                 return (
                   <span
                     key={segIdx}
-                    className="inline-block transition-all"
-                    style={{
-                      ...bgStyle,
-                      color: isHighlighted ? project.text.color : project.text.color,
-                      opacity: isHighlighted || isPastLine ? 1 : unhighlightedOpacity,
-                      padding: isHighlighted || isCurrentWord ? '2px 4px' : '2px 0',
-                      borderRadius: '4px',
-                      transitionDuration: `${project.reels.wordTransitionSpeed}s`,
-                    }}
+                    style={getWordStyle(isHighlighted, isCurrentWord, wordWithin)}
                   >
                     {segment}
                   </span>
