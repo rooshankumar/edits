@@ -424,6 +424,39 @@ export const VideoPreview = forwardRef<HTMLDivElement, VideoPreviewProps>(
                 muted loop autoPlay playsInline />
             )}
 
+            {/* Title Overlay - centered at top (during content only) */}
+            {!scrollState.isEnding && project.titleOverlay?.enabled && (
+              (() => {
+                const titleText = project.titleOverlay.useProjectName
+                  ? (project.name || '')
+                  : (project.titleOverlay.content || '');
+
+                if (!titleText.trim()) return null;
+
+                return (
+                  <div
+                    className="absolute left-0 right-0 z-20 flex items-start justify-center"
+                    style={{
+                      top: `${project.titleOverlay.paddingY * scaleFactor}px`,
+                      opacity: transitionOpacity.contentOpacity,
+                    }}
+                  >
+                    <div
+                      className="px-3 py-1"
+                      style={{
+                        backgroundColor: project.titleOverlay.backgroundColor,
+                        color: project.titleOverlay.color,
+                        fontSize: `${project.titleOverlay.fontSize * scaleFactor}px`,
+                        fontWeight: 700,
+                      }}
+                    >
+                      {titleText}
+                    </div>
+                  </div>
+                );
+              })()
+            )}
+
             {/* Overlay Text - Only show during content, not ending */}
             {!scrollState.isEnding && project.overlay.enabled && project.overlay.content && (
               <div className={cn('absolute left-0 right-0 z-10 text-center px-2 py-1',
