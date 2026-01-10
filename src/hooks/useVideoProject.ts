@@ -2,7 +2,7 @@ import { useState, useCallback, useEffect } from 'react';
 import {
   VideoProject, DEFAULT_PROJECT, CanvasFormat,
   TextSettings, BackgroundSettings, AnimationSettings, AudioSettings,
-  WatermarkSettings, OverlayTextSettings, EndingSettings, LyricsThemeSettings, ReelsThemeSettings, TitleOverlaySettings,
+  WatermarkSettings, OverlayTextSettings, EndingSettings, LyricsThemeSettings, TitleOverlaySettings,
   calculateDurationFromWPM, calculateWPMFromDuration, WPM_PRESETS
 } from '@/types/video-project';
 import { parseKaraokeLrc } from '@/utils/karaokeLrc';
@@ -87,7 +87,6 @@ export function useVideoProject() {
           ...DEFAULT_PROJECT,
           ...parsed,
           lyrics: { ...DEFAULT_PROJECT.lyrics, ...parsed.lyrics },
-          reels: { ...DEFAULT_PROJECT.reels, ...parsed.reels },
           text: { ...DEFAULT_PROJECT.text, ...parsed.text },
           pagedText: { ...DEFAULT_PROJECT.pagedText, ...parsed.pagedText },
           audio: { ...DEFAULT_PROJECT.audio, ...parsed.audio },
@@ -122,7 +121,6 @@ export function useVideoProject() {
           ...DEFAULT_PROJECT,
           ...p,
           lyrics: { ...DEFAULT_PROJECT.lyrics, ...p.lyrics },
-          reels: { ...DEFAULT_PROJECT.reels, ...p.reels },
           text: { ...DEFAULT_PROJECT.text, ...p.text },
           pagedText: { ...DEFAULT_PROJECT.pagedText, ...p.pagedText },
           audio: { ...DEFAULT_PROJECT.audio, ...p.audio },
@@ -307,14 +305,6 @@ export function useVideoProject() {
     }));
   }, []);
 
-  const updateReels = useCallback((updates: Partial<ReelsThemeSettings>) => {
-    setProject(prev => ({
-      ...prev,
-      reels: { ...prev.reels, ...updates },
-      updatedAt: Date.now(),
-    }));
-  }, []);
-
   const setCanvasFormat = useCallback((format: CanvasFormat) => {
     updateProject({ canvasFormat: format });
   }, [updateProject]);
@@ -342,7 +332,6 @@ export function useVideoProject() {
         ...DEFAULT_PROJECT,
         ...found,
         lyrics: { ...DEFAULT_PROJECT.lyrics, ...found.lyrics },
-        reels: { ...DEFAULT_PROJECT.reels, ...found.reels },
         text: { ...DEFAULT_PROJECT.text, ...found.text },
         pagedText: { ...DEFAULT_PROJECT.pagedText, ...found.pagedText },
         audio: { ...DEFAULT_PROJECT.audio, ...found.audio },
@@ -384,7 +373,6 @@ export function useVideoProject() {
     updateProject,
     updateText,
     updateLyrics,
-    updateReels,
     updateBackground,
     updateAnimation,
     updateAudio,

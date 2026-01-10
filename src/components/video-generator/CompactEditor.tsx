@@ -9,7 +9,7 @@ import {
 import { 
   VideoProject, TextSettings, BackgroundSettings, AnimationSettings, AudioSettings,
   WatermarkSettings, OverlayTextSettings, EndingSettings,
-  FONT_FAMILIES, CANVAS_SIZES, CanvasFormat, VideoTheme, LyricsPacingSource, LyricsThemeSettings, ReelsThemeSettings, WPMPreset, WPM_PRESETS,
+  FONT_FAMILIES, CANVAS_SIZES, CanvasFormat, VideoTheme, LyricsPacingSource, LyricsThemeSettings, WPMPreset, WPM_PRESETS,
   LyricsTimingSource, LyricsDisplayMode, TitleOverlaySettings
 } from '@/types/video-project';
 import { TimelineState, getWPMLevel } from '@/utils/timeline';
@@ -27,6 +27,7 @@ import { OverlayControls } from './OverlayControls';
 import { EndingControls } from './EndingControls';
 import { cn } from '@/lib/utils';
 import { parseKaraokeLrc } from '@/utils/karaokeLrc';
+import { Smartphone, Monitor, Square, Instagram } from 'lucide-react';
 
 interface CompactEditorProps {
   project: VideoProject;
@@ -34,7 +35,6 @@ interface CompactEditorProps {
   onProjectChange: (updates: Partial<VideoProject>) => void;
   onThemeChange: (theme: VideoTheme) => void;
   onLyricsChange: (updates: Partial<LyricsThemeSettings>) => void;
-  onReelsChange: (updates: Partial<ReelsThemeSettings>) => void;
   onCanvasFormatChange: (format: CanvasFormat) => void;
   onTextChange: (updates: Partial<TextSettings>) => void;
   onBackgroundChange: (updates: Partial<BackgroundSettings>) => void;
@@ -85,11 +85,11 @@ function Section({ title, icon, defaultOpen = true, children, accentColor, badge
 }
 
 const durationPresets = [5, 10, 15, 30, 60];
-const canvasOptions: { value: CanvasFormat; label: string }[] = [
-  { value: 'vertical', label: 'Reel' },
-  { value: 'horizontal', label: 'Desktop' },
-  { value: 'square', label: 'Square' },
-  { value: 'instagram-post', label: 'IG' },
+const canvasOptions: { value: CanvasFormat; icon: typeof Smartphone }[] = [
+  { value: 'vertical', icon: Smartphone },
+  { value: 'horizontal', icon: Monitor },
+  { value: 'square', icon: Square },
+  { value: 'instagram-post', icon: Instagram },
 ];
 
 export function CompactEditor({
@@ -98,7 +98,6 @@ export function CompactEditor({
   onProjectChange,
   onThemeChange,
   onLyricsChange,
-  onReelsChange,
   onCanvasFormatChange,
   onTextChange,
   onBackgroundChange,
@@ -189,65 +188,61 @@ export function CompactEditor({
   return (
     <ScrollArea className="h-full min-h-0">
       <div className="divide-y divide-border">
-        {/* Canvas Format */}
+        {/* Canvas Format - Icons Only */}
         <div className="p-3 bg-card border-b border-border">
-          <label className="text-xs font-semibold text-foreground mb-2 block">Canvas Format</label>
+          <label className="text-xs font-semibold text-foreground mb-2 block">Format</label>
           <div className="grid grid-cols-4 gap-1.5">
-            {canvasOptions.map((opt) => (
-              <button
-                key={opt.value}
-                onClick={() => onCanvasFormatChange(opt.value)}
-                className={cn(
-                  'px-2 py-1.5 text-[10px] font-medium transition-all border excel-hover',
-                  project.canvasFormat === opt.value
-                    ? 'bg-excel-selected border-primary border-2'
-                    : 'bg-card border-border'
-                )}
-              >
-                {opt.label}
-              </button>
-            ))}
+            {canvasOptions.map((opt) => {
+              const Icon = opt.icon;
+              return (
+                <button
+                  key={opt.value}
+                  onClick={() => onCanvasFormatChange(opt.value)}
+                  title={CANVAS_SIZES[opt.value].label}
+                  className={cn(
+                    'p-2 flex items-center justify-center transition-all border excel-hover',
+                    project.canvasFormat === opt.value
+                      ? 'bg-excel-selected border-primary border-2'
+                      : 'bg-card border-border'
+                  )}
+                >
+                  <Icon className={cn('w-4 h-4', project.canvasFormat === opt.value ? 'text-primary' : 'text-muted-foreground')} />
+                </button>
+              );
+            })}
           </div>
           <p className="text-[10px] text-muted-foreground mt-2 text-center">
             {CANVAS_SIZES[project.canvasFormat].width}×{CANVAS_SIZES[project.canvasFormat].height}
           </p>
         </div>
 
+        {/* Theme - Icons Only */}
         <div className="p-3 bg-card border-b border-border">
-          <label className="text-xs font-semibold text-foreground mb-2 block">Video Theme</label>
-          <div className="grid grid-cols-3 gap-1.5">
+          <label className="text-xs font-semibold text-foreground mb-2 block">Theme</label>
+          <div className="grid grid-cols-2 gap-1.5">
             <button
               onClick={() => onThemeChange('vertical')}
+              title="Scroll"
               className={cn(
-                'px-2 py-1.5 text-[10px] font-medium transition-all border excel-hover',
+                'p-2 flex items-center justify-center transition-all border excel-hover',
                 project.theme === 'vertical'
                   ? 'bg-excel-selected border-primary border-2'
                   : 'bg-card border-border'
               )}
             >
-              Scroll
+              <Type className={cn('w-4 h-4', project.theme === 'vertical' ? 'text-primary' : 'text-muted-foreground')} />
             </button>
             <button
               onClick={() => onThemeChange('lyrics')}
+              title="Lyrics"
               className={cn(
-                'px-2 py-1.5 text-[10px] font-medium transition-all border excel-hover',
+                'p-2 flex items-center justify-center transition-all border excel-hover',
                 project.theme === 'lyrics'
                   ? 'bg-excel-selected border-primary border-2'
                   : 'bg-card border-border'
               )}
             >
-              Karaoke
-            </button>
-            <button
-              onClick={() => onThemeChange('reels')}
-              className={cn(
-                'px-2 py-1.5 text-[10px] font-medium transition-all border excel-hover',
-                project.theme === 'reels'
-                  ? 'bg-excel-selected border-primary border-2'
-                  : 'bg-card border-border'
-              )}
-            >
-              Reels
+              <Music className={cn('w-4 h-4', project.theme === 'lyrics' ? 'text-primary' : 'text-muted-foreground')} />
             </button>
           </div>
         </div>
@@ -542,253 +537,6 @@ export function CompactEditor({
           </div>
         )}
 
-        {/* REELS Theme Settings */}
-        {project.theme === 'reels' && (
-          <div className="p-3 bg-card border-b border-border space-y-3">
-            {/* Sync Settings */}
-            <div>
-              <label className="text-[10px] font-medium text-muted-foreground mb-1 block">Sync Mode</label>
-              <Select
-                value={project.reels.syncMode}
-                onValueChange={(v) => onReelsChange({ syncMode: v as 'lrc' | 'auto' })}
-              >
-                <SelectTrigger className="h-7 text-[10px] border-border">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent className="border-border">
-                  <SelectItem value="auto" className="text-xs">Auto (estimate timing)</SelectItem>
-                  <SelectItem value="lrc" className="text-xs">LRC (word-timed)</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            {project.reels.syncMode === 'lrc' && (
-              <div>
-                <label className="text-[10px] font-medium text-muted-foreground mb-1 block">LRC Content</label>
-                <Textarea
-                  value={project.reels.lrcContent}
-                  onChange={(e) => onReelsChange({ lrcContent: e.target.value })}
-                  placeholder="Paste your word-timed LRC here..."
-                  className="min-h-[100px] resize-none border-border text-xs"
-                />
-              </div>
-            )}
-
-            {/* Highlight Style Section */}
-            <div className="pt-2 border-t border-border">
-              <label className="text-[10px] font-semibold text-foreground mb-2 block">Highlight Style</label>
-              
-              <div className="grid grid-cols-3 gap-1.5 mb-3">
-                {(['glow', 'color-change', 'sweep'] as const).map((type) => (
-                  <button
-                    key={type}
-                    onClick={() => onReelsChange({ highlightType: type })}
-                    className={cn(
-                      'px-2 py-1.5 text-[10px] font-medium transition-all border excel-hover capitalize',
-                      project.reels.highlightType === type
-                        ? 'bg-excel-selected border-primary border-2'
-                        : 'bg-card border-border'
-                    )}
-                  >
-                    {type === 'color-change' ? 'Color' : type}
-                  </button>
-                ))}
-              </div>
-
-              <div className="flex items-center justify-between px-3 py-2 border border-border excel-hover">
-                <div>
-                  <p className="text-[10px] font-medium">Highlight Color</p>
-                </div>
-                <Input
-                  type="color"
-                  value={project.reels.highlightColor}
-                  onChange={(e) => onReelsChange({ highlightColor: e.target.value })}
-                  className="h-7 w-10 p-0 border-border"
-                />
-              </div>
-
-              {project.reels.highlightType === 'glow' && (
-                <div className="mt-2">
-                  <label className="text-[10px] font-medium text-muted-foreground mb-1 block">
-                    Glow intensity: {project.reels.glowIntensity}px
-                  </label>
-                  <Slider
-                    value={[project.reels.glowIntensity]}
-                    onValueChange={([v]) => onReelsChange({ glowIntensity: v })}
-                    min={4}
-                    max={30}
-                    step={1}
-                  />
-                </div>
-              )}
-
-              <div className="mt-2">
-                <label className="text-[10px] font-medium text-muted-foreground mb-1 block">Animation Easing</label>
-                <Select
-                  value={project.reels.easingType}
-                  onValueChange={(v) => onReelsChange({ easingType: v as 'linear' | 'ease-in-out' | 'spring' })}
-                >
-                  <SelectTrigger className="h-7 text-[10px] border-border">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent className="border-border">
-                    <SelectItem value="ease-in-out" className="text-xs">Smooth (ease-in-out)</SelectItem>
-                    <SelectItem value="spring" className="text-xs">Bouncy (spring)</SelectItem>
-                    <SelectItem value="linear" className="text-xs">Linear</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            {/* Visual Polish Section */}
-            <div className="pt-2 border-t border-border">
-              <label className="text-[10px] font-semibold text-foreground mb-2 block">Visual Style</label>
-              
-              <div className="flex items-center justify-between px-3 py-2 border border-border excel-hover">
-                <div>
-                  <p className="text-[10px] font-medium">Text Shadow</p>
-                  <p className="text-[9px] text-muted-foreground">Drop shadow for depth</p>
-                </div>
-                <Switch
-                  checked={project.reels.textShadow}
-                  onCheckedChange={(checked) => onReelsChange({ textShadow: checked })}
-                />
-              </div>
-
-              {project.reels.textShadow && (
-                <>
-                  <div className="mt-2">
-                    <label className="text-[10px] font-medium text-muted-foreground mb-1 block">
-                      Shadow blur: {project.reels.textShadowBlur}px
-                    </label>
-                    <Slider
-                      value={[project.reels.textShadowBlur]}
-                      onValueChange={([v]) => onReelsChange({ textShadowBlur: v })}
-                      min={2}
-                      max={20}
-                      step={1}
-                    />
-                  </div>
-                  <div className="mt-2">
-                    <label className="text-[10px] font-medium text-muted-foreground mb-1 block">
-                      Shadow opacity: {(project.reels.textShadowOpacity * 100).toFixed(0)}%
-                    </label>
-                    <Slider
-                      value={[project.reels.textShadowOpacity]}
-                      onValueChange={([v]) => onReelsChange({ textShadowOpacity: v })}
-                      min={0.1}
-                      max={1}
-                      step={0.05}
-                    />
-                  </div>
-                </>
-              )}
-
-              <div className="flex items-center justify-between px-3 py-2 border border-border excel-hover mt-2">
-                <div>
-                  <p className="text-[10px] font-medium">Vignette</p>
-                  <p className="text-[9px] text-muted-foreground">Darken edges for focus</p>
-                </div>
-                <Switch
-                  checked={project.reels.vignette}
-                  onCheckedChange={(checked) => onReelsChange({ vignette: checked })}
-                />
-              </div>
-
-              {project.reels.vignette && (
-                <div className="mt-2">
-                  <label className="text-[10px] font-medium text-muted-foreground mb-1 block">
-                    Vignette intensity: {(project.reels.vignetteIntensity * 100).toFixed(0)}%
-                  </label>
-                  <Slider
-                    value={[project.reels.vignetteIntensity]}
-                    onValueChange={([v]) => onReelsChange({ vignetteIntensity: v })}
-                    min={0.1}
-                    max={0.8}
-                    step={0.05}
-                  />
-                </div>
-              )}
-            </div>
-
-            {/* Motion Section */}
-            <div className="pt-2 border-t border-border">
-              <label className="text-[10px] font-semibold text-foreground mb-2 block">Motion</label>
-              
-              <div className="flex items-center justify-between px-3 py-2 border border-border excel-hover">
-                <div>
-                  <p className="text-[10px] font-medium">Kinetic Scroll</p>
-                  <p className="text-[9px] text-muted-foreground">Gentle upward drift</p>
-                </div>
-                <Switch
-                  checked={project.reels.kinetic}
-                  onCheckedChange={(checked) => onReelsChange({ kinetic: checked })}
-                />
-              </div>
-
-              {project.reels.kinetic && (
-                <div className="mt-2">
-                  <label className="text-[10px] font-medium text-muted-foreground mb-1 block">
-                    Kinetic speed: {project.reels.kineticSpeed.toFixed(2)}
-                  </label>
-                  <Slider
-                    value={[project.reels.kineticSpeed]}
-                    onValueChange={([v]) => onReelsChange({ kineticSpeed: v })}
-                    min={0.05}
-                    max={0.5}
-                    step={0.01}
-                  />
-                </div>
-              )}
-            </div>
-
-            {/* Display Section */}
-            <div className="pt-2 border-t border-border">
-              <label className="text-[10px] font-semibold text-foreground mb-2 block">Display</label>
-              
-              <div>
-                <label className="text-[10px] font-medium text-muted-foreground mb-1 block">
-                  Lines visible: {project.reels.linesVisible}
-                </label>
-                <Slider
-                  value={[project.reels.linesVisible]}
-                  onValueChange={([v]) => onReelsChange({ linesVisible: v })}
-                  min={4}
-                  max={10}
-                  step={1}
-                />
-              </div>
-
-              <div className="mt-2">
-                <label className="text-[10px] font-medium text-muted-foreground mb-1 block">
-                  Unhighlighted opacity: {(project.reels.unhighlightedOpacity * 100).toFixed(0)}%
-                </label>
-                <Slider
-                  value={[project.reels.unhighlightedOpacity]}
-                  onValueChange={([v]) => onReelsChange({ unhighlightedOpacity: v })}
-                  min={0.1}
-                  max={0.8}
-                  step={0.05}
-                />
-              </div>
-
-              <div className="mt-2">
-                <label className="text-[10px] font-medium text-muted-foreground mb-1 block">
-                  Word transition: {project.reels.wordTransitionSpeed.toFixed(2)}s
-                </label>
-                <Slider
-                  value={[project.reels.wordTransitionSpeed]}
-                  onValueChange={([v]) => onReelsChange({ wordTransitionSpeed: v })}
-                  min={0.05}
-                  max={0.5}
-                  step={0.01}
-                />
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* TEXT Section */}
         <Section title="Text" icon={<Type className="w-3 h-3" />}>
           <div>
             <label className="text-[10px] font-medium text-muted-foreground mb-1 block">Content</label>
