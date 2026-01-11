@@ -345,7 +345,8 @@ export function useVideoExport() {
             }
 
             ctx.fillStyle = project.titleOverlay.color;
-            ctx.font = `bold ${project.titleOverlay.fontSize}px ${project.text.fontFamily}`;
+            const titleFontPrefix = `${project.titleOverlay.isItalic ? 'italic ' : ''}${project.titleOverlay.isBold ? 'bold ' : ''}`;
+            ctx.font = `${titleFontPrefix}${project.titleOverlay.fontSize}px ${project.titleOverlay.fontFamily || project.text.fontFamily}`;
             ctx.fillText(titleText, width / 2, project.titleOverlay.paddingY);
             ctx.restore();
           }

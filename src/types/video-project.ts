@@ -36,7 +36,10 @@ export interface TitleOverlaySettings {
   enabled: boolean;
   useProjectName: boolean;
   content: string;
+  fontFamily: string;
   fontSize: number;
+  isBold: boolean;
+  isItalic: boolean;
   color: string;
   backgroundColor: string;
   paddingY: number;
@@ -185,27 +188,35 @@ export const WPM_PRESETS: Record<WPMPreset, { label: string; wpm: number; descri
 };
 
 export const FONT_FAMILIES = [
+  // Readable
   { name: 'Inter', value: 'Inter, sans-serif', category: 'readable' },
   { name: 'Poppins', value: 'Poppins, sans-serif', category: 'readable' },
   { name: 'Montserrat', value: 'Montserrat, sans-serif', category: 'readable' },
   { name: 'Open Sans', value: 'Open Sans, sans-serif', category: 'readable' },
   { name: 'Roboto', value: 'Roboto, sans-serif', category: 'readable' },
   { name: 'Raleway', value: 'Raleway, sans-serif', category: 'readable' },
-  { name: 'System UI', value: 'system-ui, -apple-system, Segoe UI, Roboto, sans-serif', category: 'readable' },
-  { name: 'Segoe UI', value: 'Segoe UI, system-ui, sans-serif', category: 'readable' },
-  { name: 'Arial', value: 'Arial, Helvetica, sans-serif', category: 'readable' },
-  { name: 'Helvetica', value: 'Helvetica, Arial, sans-serif', category: 'readable' },
-  { name: 'Verdana', value: 'Verdana, Geneva, sans-serif', category: 'readable' },
-  { name: 'Tahoma', value: 'Tahoma, Geneva, sans-serif', category: 'readable' },
-  { name: 'Trebuchet MS', value: 'Trebuchet MS, Arial, sans-serif', category: 'readable' },
+  { name: 'Quicksand', value: 'Quicksand, sans-serif', category: 'readable' },
+  // Display/Bold
+  { name: 'Bebas Neue', value: 'Bebas Neue, sans-serif', category: 'display' },
+  { name: 'Righteous', value: 'Righteous, sans-serif', category: 'display' },
+  { name: 'Russo One', value: 'Russo One, sans-serif', category: 'display' },
+  { name: 'Bangers', value: 'Bangers, cursive', category: 'display' },
+  { name: 'Oswald', value: 'Oswald, sans-serif', category: 'display' },
+  // Modern/Tech
+  { name: 'Orbitron', value: 'Orbitron, sans-serif', category: 'modern' },
+  // Elegant
   { name: 'Playfair Display', value: 'Playfair Display, serif', category: 'elegant' },
   { name: 'Lora', value: 'Lora, serif', category: 'elegant' },
+  { name: 'Cinzel', value: 'Cinzel, serif', category: 'elegant' },
   { name: 'Georgia', value: 'Georgia, serif', category: 'elegant' },
-  { name: 'Times New Roman', value: 'Times New Roman, Times, serif', category: 'elegant' },
-  { name: 'Oswald', value: 'Oswald, sans-serif', category: 'display' },
-  { name: 'Impact', value: 'Impact, Haettenschweiler, Arial Narrow Bold, sans-serif', category: 'display' },
-  { name: 'Comic Sans', value: 'Comic Sans MS, Comic Sans, cursive', category: 'display' },
+  // Script/Handwritten
   { name: 'Dancing Script', value: 'Dancing Script, cursive', category: 'script' },
+  { name: 'Pacifico', value: 'Pacifico, cursive', category: 'script' },
+  { name: 'Caveat', value: 'Caveat, cursive', category: 'script' },
+  { name: 'Lobster', value: 'Lobster, cursive', category: 'script' },
+  { name: 'Permanent Marker', value: 'Permanent Marker, cursive', category: 'script' },
+  { name: 'Shadows Into Light', value: 'Shadows Into Light, cursive', category: 'script' },
+  // Mono
   { name: 'Courier New', value: 'Courier New, Courier, monospace', category: 'mono' },
   { name: 'Consolas', value: 'Consolas, Monaco, monospace', category: 'mono' },
 ];
@@ -289,7 +300,10 @@ export const DEFAULT_PROJECT: Omit<VideoProject, 'id' | 'createdAt' | 'updatedAt
     enabled: false,
     useProjectName: true,
     content: '',
+    fontFamily: 'Poppins, sans-serif',
     fontSize: 34,
+    isBold: true,
+    isItalic: false,
     color: '#ffffff',
     backgroundColor: 'rgba(0,0,0,0)',
     paddingY: 24,

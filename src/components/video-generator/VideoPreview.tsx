@@ -446,7 +446,9 @@ export const VideoPreview = forwardRef<HTMLDivElement, VideoPreviewProps>(
                         backgroundColor: project.titleOverlay.backgroundColor,
                         color: project.titleOverlay.color,
                         fontSize: `${project.titleOverlay.fontSize * scaleFactor}px`,
-                        fontWeight: 700,
+                        fontFamily: project.titleOverlay.fontFamily || project.text.fontFamily,
+                        fontWeight: project.titleOverlay.isBold ? 700 : 400,
+                        fontStyle: project.titleOverlay.isItalic ? 'italic' : 'normal',
                       }}
                     >
                       {titleText}

@@ -1,8 +1,8 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { Sparkles } from 'lucide-react';
 import { useVideoProject } from '@/hooks/useVideoProject';
 import { useVideoExport } from '@/hooks/useVideoExport';
-import { CompactEditor } from '@/components/video-generator/CompactEditor';
+import { LeftEditorPanel } from '@/components/video-generator/LeftEditorPanel';
+import { RightEditorPanel } from '@/components/video-generator/RightEditorPanel';
 import { VideoPreview } from '@/components/video-generator/VideoPreview';
 import { PlaybackControls } from '@/components/video-generator/PlaybackControls';
 import { ProjectManager } from '@/components/video-generator/ProjectManager';
@@ -30,7 +30,6 @@ export default function Index() {
   const startTimeRef = useRef<number | null>(null);
   const wasPlayingRef = useRef(false);
 
-  // Use unified timeline engine - SINGLE SOURCE OF TRUTH
   const baseTimeline = computeTimeline(
     project.text.content,
     project.animation.wpmPreset,
@@ -39,7 +38,6 @@ export default function Index() {
     project.ending.duration
   );
 
-  // For lyrics theme with LRC + autoFitLrcToAudio: audio duration is authoritative
   const timeline = (
     project.theme === 'lyrics' &&
     project.lyrics.timingSource === 'lrc' &&
@@ -54,12 +52,10 @@ export default function Index() {
 
   const useAudioClock = !!project.audio.file;
 
-  // Ensure we always know the real audio duration (needed for auto-fit and correct timeline)
   useEffect(() => {
     if (!useAudioClock) return;
     const el = audioRef.current;
     if (!el) return;
-
     const syncDuration = () => {
       const d = Number.isFinite(el.duration) ? el.duration : null;
       const normalized = d && d > 0 ? d : null;
@@ -68,18 +64,11 @@ export default function Index() {
         updateAudio({ duration: normalized });
       }
     };
-
-    const onEnded = () => {
-      if (!project.audio.loop) {
-        setIsPlaying(false);
-      }
-    };
-
+    const onEnded = () => { if (!project.audio.loop) setIsPlaying(false); };
     el.addEventListener('loadedmetadata', syncDuration);
     el.addEventListener('durationchange', syncDuration);
     el.addEventListener('ended', onEnded);
     syncDuration();
-
     return () => {
       el.removeEventListener('loadedmetadata', syncDuration);
       el.removeEventListener('durationchange', syncDuration);
@@ -87,7 +76,6 @@ export default function Index() {
     };
   }, [project.audio.duration, project.audio.file, project.audio.loop, updateAudio, useAudioClock]);
 
-  // Keep audio element settings in sync (without restarting playback)
   useEffect(() => {
     const el = audioRef.current;
     if (!el || !project.audio.file) return;
@@ -95,44 +83,26 @@ export default function Index() {
     el.loop = project.audio.loop;
   }, [project.audio.file, project.audio.loop, project.audio.volume]);
 
-  // Animation loop - uses unified timeline; when audio exists it is the authoritative clock.
   useEffect(() => {
     const el = audioRef.current;
     const wasPlaying = wasPlayingRef.current;
-
-    // Track transitions explicitly
     wasPlayingRef.current = isPlaying;
-
     if (isPlaying) {
       if (useAudioClock && el && project.audio.file) {
-        // Only seek when we are starting playback (prevents crackling from repeated seeks)
-        if (!wasPlaying && Math.abs(el.currentTime - currentTime) > 0.05) {
-          el.currentTime = currentTime;
-        }
-
-        if (!wasPlaying) {
-          el.play().catch(() => {});
-        }
+        if (!wasPlaying && Math.abs(el.currentTime - currentTime) > 0.05) el.currentTime = currentTime;
+        if (!wasPlaying) el.play().catch(() => {});
       } else {
         startTimeRef.current = performance.now() - (currentTime * 1000);
       }
-
       const animate = (now: number) => {
-        const elapsed = (useAudioClock && el)
-          ? el.currentTime
-          : (() => {
-            if (!startTimeRef.current) startTimeRef.current = now;
-            return (now - startTimeRef.current) / 1000;
-          })();
-
+        const elapsed = (useAudioClock && el) ? el.currentTime : (() => {
+          if (!startTimeRef.current) startTimeRef.current = now;
+          return (now - startTimeRef.current) / 1000;
+        })();
         if (elapsed >= timeline.totalDuration) {
           if (project.animation.isLooping) {
-            if (useAudioClock && el) {
-              el.currentTime = 0;
-              el.play().catch(() => {});
-            } else {
-              startTimeRef.current = now;
-            }
+            if (useAudioClock && el) { el.currentTime = 0; el.play().catch(() => {}); }
+            else { startTimeRef.current = now; }
             setCurrentTime(0);
           } else {
             setIsPlaying(false);
@@ -142,35 +112,21 @@ export default function Index() {
         } else {
           setCurrentTime(elapsed);
         }
-
         animationRef.current = requestAnimationFrame(animate);
       };
-
       animationRef.current = requestAnimationFrame(animate);
-
-      return () => {
-        if (animationRef.current) cancelAnimationFrame(animationRef.current);
-      };
+      return () => { if (animationRef.current) cancelAnimationFrame(animationRef.current); };
     }
-
-    if (!isPlaying && useAudioClock && el) {
-      // Only pause when transitioning from playing -> paused
-      if (wasPlaying) el.pause();
-    }
+    if (!isPlaying && useAudioClock && el && wasPlaying) el.pause();
   }, [currentTime, isPlaying, project.animation.isLooping, project.audio.file, timeline.totalDuration, useAudioClock]);
 
   const handlePlayPause = useCallback(() => {
-    if (!isPlaying && currentTime >= timeline.totalDuration) {
-      setCurrentTime(0);
-      startTimeRef.current = null;
-    }
+    if (!isPlaying && currentTime >= timeline.totalDuration) { setCurrentTime(0); startTimeRef.current = null; }
     setIsPlaying(!isPlaying);
   }, [isPlaying, currentTime, timeline.totalDuration]);
 
   const handleReset = useCallback(() => {
-    setIsPlaying(false);
-    setCurrentTime(0);
-    startTimeRef.current = null;
+    setIsPlaying(false); setCurrentTime(0); startTimeRef.current = null;
     if (audioRef.current) audioRef.current.currentTime = 0;
     wasPlayingRef.current = false;
   }, []);
@@ -187,8 +143,7 @@ export default function Index() {
 
   return (
     <div className="h-screen flex flex-col bg-background overflow-hidden">
-      {/* Header - Excel Style - Mobile Responsive */}
-      <header className="h-9 md:h-9 flex items-center justify-between px-2 md:px-3 border-b border-border bg-card shrink-0">
+      <header className="h-9 flex items-center justify-between px-2 md:px-3 border-b border-border bg-card shrink-0">
         <div className="flex items-center gap-2">
           <img src="/globe-favicon.png" alt="roshLingua Logo" title="editbyroshlingua" className="h-6" />
           <span className="text-xs md:text-sm font-semibold text-foreground whitespace-nowrap">
@@ -196,41 +151,37 @@ export default function Index() {
             <span className="sm:hidden">editbyrosh</span>
           </span>
         </div>
-        <ProjectManager 
-          project={project} 
-          savedProjects={savedProjects} 
-          onSave={saveProject} 
-          onLoad={loadProject} 
-          onDelete={deleteProject} 
-          onNew={newProject} 
-          onDuplicate={duplicateProject} 
-          onRename={(name) => updateProject({ name })} 
-        />
+        <ProjectManager project={project} savedProjects={savedProjects} onSave={saveProject} onLoad={loadProject} onDelete={deleteProject} onNew={newProject} onDuplicate={duplicateProject} onRename={(name) => updateProject({ name })} />
         <ThemeToggle />
       </header>
 
-      {/* Main Editor Layout - Excel Style - Mobile Responsive */}
       <div className="flex-1 flex overflow-hidden min-h-0">
-        {/* Left Sidebar - Property Panel - Hidden on mobile, show as bottom sheet */}
-        <aside className="hidden md:flex w-64 max-w-[280px] border-r border-border bg-excel-header shrink-0 overflow-hidden min-h-0 flex-col">
-          <div className="flex-1 min-h-0">
-            <CompactEditor
-              project={project}
-              timeline={timeline}
-              onProjectChange={updateProject}
-              onThemeChange={setTheme}
-              onLyricsChange={updateLyrics}
-              onCanvasFormatChange={setCanvasFormat}
-              onTextChange={updateText}
-              onBackgroundChange={updateBackground}
-              onAnimationChange={updateAnimation}
-              onAudioChange={updateAudio}
-              onWatermarkChange={updateWatermark}
-              onTitleOverlayChange={updateTitleOverlay}
-              onOverlayChange={updateOverlay}
-              onEndingChange={updateEnding}
-            />
+        {/* Left Panel - Secondary Controls */}
+        <aside className="hidden md:flex w-[160px] border-r border-border bg-excel-header shrink-0 overflow-hidden min-h-0 flex-col">
+          <LeftEditorPanel project={project} onBackgroundChange={updateBackground} onAudioChange={updateAudio} onWatermarkChange={updateWatermark} onOverlayChange={updateOverlay} onEndingChange={updateEnding} />
+        </aside>
+
+        {/* Main Preview Area */}
+        <main className="flex-1 flex flex-col min-w-0 bg-card">
+          <div className="flex-1 flex items-center justify-center p-2 md:p-4 min-h-0 bg-excel-grid">
+            <VideoPreview ref={previewRef} project={project} isPlaying={isPlaying} currentTime={currentTime} contentDuration={timeline.contentDuration} totalDuration={timeline.totalDuration} audioRef={audioRef} />
           </div>
+          <div className="shrink-0 border-t border-border bg-excel-header p-2 md:p-3 space-y-1.5 md:space-y-2">
+            <div className="max-w-lg mx-auto w-full">
+              <TimelineBar currentTime={currentTime} duration={timeline.totalDuration} isPlaying={isPlaying} onSeek={handleSeek} />
+            </div>
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-2">
+              <button onClick={() => setShowMobileEditor(!showMobileEditor)} className="md:hidden px-3 py-1.5 text-[10px] font-medium border border-border bg-card hover:bg-excel-hover rounded">
+                {showMobileEditor ? 'Hide' : 'Show'} Editor
+              </button>
+              <PlaybackControls isPlaying={isPlaying} onPlayPause={handlePlayPause} onReset={handleReset} onExport={() => setShowExportDialog(true)} isExporting={exportState.isExporting} exportProgress={exportState.progress} />
+            </div>
+          </div>
+        </main>
+
+        {/* Right Panel - Core Controls */}
+        <aside className="hidden md:flex w-[220px] border-l border-border bg-excel-header shrink-0 overflow-hidden min-h-0 flex-col">
+          <RightEditorPanel project={project} timeline={timeline} onProjectChange={updateProject} onThemeChange={setTheme} onLyricsChange={updateLyrics} onCanvasFormatChange={setCanvasFormat} onTextChange={updateText} onAnimationChange={updateAnimation} onTitleOverlayChange={updateTitleOverlay} />
         </aside>
 
         {/* Main Preview Area - Mobile Responsive */}
