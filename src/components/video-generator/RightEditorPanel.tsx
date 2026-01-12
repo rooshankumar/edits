@@ -1,19 +1,17 @@
 import { useMemo, useState } from 'react';
 import { 
-  Type, Sparkles, Music, ChevronDown, ChevronUp, 
+  Type, Sparkles, ChevronDown, ChevronUp, 
   Bold, Italic, AlignLeft, AlignCenter, AlignRight,
   AlignVerticalJustifyStart, AlignVerticalJustifyCenter, AlignVerticalJustifyEnd,
-  RotateCcw, AlertTriangle, Maximize2
+  RotateCcw, AlertTriangle, Maximize2, Music
 } from 'lucide-react';
-import { Smartphone, Monitor, Square, Instagram } from 'lucide-react';
 import { 
   VideoProject, TextSettings, AnimationSettings,
-  FONT_FAMILIES, CANVAS_SIZES, CanvasFormat, VideoTheme, LyricsPacingSource, LyricsThemeSettings, WPMPreset, WPM_PRESETS,
-  LyricsTimingSource, LyricsDisplayMode, TitleOverlaySettings
+  FONT_FAMILIES, WPMPreset, WPM_PRESETS,
+  LyricsTimingSource, LyricsDisplayMode, LyricsThemeSettings
 } from '@/types/video-project';
 import { TimelineState, getWPMLevel } from '@/utils/timeline';
 import { getContentLengthCategory } from '@/utils/textScaling';
-import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Slider } from '@/components/ui/slider';
 import { Switch } from '@/components/ui/switch';
@@ -26,12 +24,9 @@ interface RightEditorPanelProps {
   project: VideoProject;
   timeline: TimelineState;
   onProjectChange: (updates: Partial<VideoProject>) => void;
-  onThemeChange: (theme: VideoTheme) => void;
   onLyricsChange: (updates: Partial<LyricsThemeSettings>) => void;
-  onCanvasFormatChange: (format: CanvasFormat) => void;
   onTextChange: (updates: Partial<TextSettings>) => void;
   onAnimationChange: (updates: Partial<AnimationSettings>) => void;
-  onTitleOverlayChange: (updates: Partial<TitleOverlaySettings>) => void;
 }
 
 interface SectionProps {
@@ -50,7 +45,7 @@ function Section({ title, icon, defaultOpen = true, children, badge }: SectionPr
       <button
         onClick={() => setIsOpen(!isOpen)}
         className={cn(
-          'w-full flex items-center justify-between px-2 py-1.5 excel-hover bg-card border-b border-border',
+          'w-full flex items-center justify-between px-2 py-1.5 excel-hover bg-card border-b border-border transition-colors',
           isOpen && 'bg-excel-selected'
         )}
       >
@@ -58,7 +53,7 @@ function Section({ title, icon, defaultOpen = true, children, badge }: SectionPr
           {icon}
           <span className="text-[10px] font-semibold text-foreground">{title}</span>
           {badge && (
-            <span className="px-1 py-0.5 text-[8px] font-medium bg-primary/10 text-primary">{badge}</span>
+            <span className="px-1 py-0.5 text-[8px] font-medium bg-primary/10 text-primary rounded">{badge}</span>
           )}
         </div>
         {isOpen ? <ChevronUp className="w-2.5 h-2.5 text-muted-foreground" /> : <ChevronDown className="w-2.5 h-2.5 text-muted-foreground" />}
@@ -73,23 +68,22 @@ function Section({ title, icon, defaultOpen = true, children, badge }: SectionPr
 }
 
 const durationPresets = [5, 10, 15, 30, 60];
-const canvasOptions: { value: CanvasFormat; icon: typeof Smartphone }[] = [
-  { value: 'vertical', icon: Smartphone },
-  { value: 'horizontal', icon: Monitor },
-  { value: 'square', icon: Square },
-  { value: 'instagram-post', icon: Instagram },
+
+// Extended text color palette
+const TEXT_COLORS = [
+  '#ffffff', '#000000', '#f3f4f6', '#1f2937',
+  '#ef4444', '#f97316', '#facc15', '#22c55e',
+  '#06b6d4', '#3b82f6', '#8b5cf6', '#ec4899',
+  '#ff6b6b', '#4ecdc4', '#ffe66d', '#a78bfa',
 ];
 
 export function RightEditorPanel({
   project,
   timeline,
   onProjectChange,
-  onThemeChange,
   onLyricsChange,
-  onCanvasFormatChange,
   onTextChange,
   onAnimationChange,
-  onTitleOverlayChange,
 }: RightEditorPanelProps) {
   const [activePageIndex, setActivePageIndex] = useState(0);
 
@@ -144,68 +138,9 @@ export function RightEditorPanel({
   return (
     <ScrollArea className="h-full min-h-0">
       <div className="divide-y divide-border">
-        {/* Canvas Format - Icons Only */}
-        <div className="p-2 bg-card border-b border-border">
-          <label className="text-[10px] font-semibold text-foreground mb-1.5 block">Format</label>
-          <div className="grid grid-cols-4 gap-1">
-            {canvasOptions.map((opt) => {
-              const Icon = opt.icon;
-              return (
-                <button
-                  key={opt.value}
-                  onClick={() => onCanvasFormatChange(opt.value)}
-                  title={CANVAS_SIZES[opt.value].label}
-                  className={cn(
-                    'p-1.5 flex items-center justify-center transition-all border excel-hover',
-                    project.canvasFormat === opt.value
-                      ? 'bg-excel-selected border-primary border-2'
-                      : 'bg-card border-border'
-                  )}
-                >
-                  <Icon className={cn('w-3.5 h-3.5', project.canvasFormat === opt.value ? 'text-primary' : 'text-muted-foreground')} />
-                </button>
-              );
-            })}
-          </div>
-          <p className="text-[9px] text-muted-foreground mt-1 text-center">
-            {CANVAS_SIZES[project.canvasFormat].width}×{CANVAS_SIZES[project.canvasFormat].height}
-          </p>
-        </div>
-
-        {/* Theme - Icons Only */}
-        <div className="p-2 bg-card border-b border-border">
-          <label className="text-[10px] font-semibold text-foreground mb-1.5 block">Theme</label>
-          <div className="grid grid-cols-2 gap-1">
-            <button
-              onClick={() => onThemeChange('vertical')}
-              title="Scroll"
-              className={cn(
-                'p-1.5 flex items-center justify-center transition-all border excel-hover',
-                project.theme === 'vertical'
-                  ? 'bg-excel-selected border-primary border-2'
-                  : 'bg-card border-border'
-              )}
-            >
-              <Type className={cn('w-3.5 h-3.5', project.theme === 'vertical' ? 'text-primary' : 'text-muted-foreground')} />
-            </button>
-            <button
-              onClick={() => onThemeChange('lyrics')}
-              title="Lyrics"
-              className={cn(
-                'p-1.5 flex items-center justify-center transition-all border excel-hover',
-                project.theme === 'lyrics'
-                  ? 'bg-excel-selected border-primary border-2'
-                  : 'bg-card border-border'
-              )}
-            >
-              <Music className={cn('w-3.5 h-3.5', project.theme === 'lyrics' ? 'text-primary' : 'text-muted-foreground')} />
-            </button>
-          </div>
-        </div>
-
-        {/* Lyrics Settings */}
+        {/* Lyrics Settings (only when lyrics theme is active) */}
         {project.theme === 'lyrics' && (
-          <div className="p-2 bg-card border-b border-border space-y-2">
+          <Section title="Lyrics" icon={<Music className="w-3 h-3" />}>
             <div>
               <label className="text-[9px] font-medium text-muted-foreground mb-1 block">Timing</label>
               <Select
@@ -262,15 +197,15 @@ export function RightEditorPanel({
 
                 <div className="flex items-center justify-between">
                   <span className="text-[9px]">Highlight</span>
-                  <Input
+                  <input
                     type="color"
                     value={project.lyrics.highlightBgColor}
                     onChange={(e) => onLyricsChange({ highlightBgColor: e.target.value })}
-                    className="h-5 w-8 p-0 border-border"
+                    className="h-5 w-6 p-0 border-border rounded cursor-pointer"
                   />
                 </div>
 
-                <div>
+                <div className="space-y-1">
                   <label className="text-[9px] text-muted-foreground">Offset: {project.lyrics.lrcOffsetSeconds.toFixed(2)}s</label>
                   <Slider
                     value={[project.lyrics.lrcOffsetSeconds]}
@@ -290,20 +225,18 @@ export function RightEditorPanel({
             )}
 
             {project.lyrics.timingSource === 'estimate' && (
-              <>
-                <div>
-                  <label className="text-[9px] text-muted-foreground">Chars/sec: {project.lyrics.charsPerSecond}</label>
-                  <Slider
-                    value={[project.lyrics.charsPerSecond]}
-                    onValueChange={([v]) => onLyricsChange({ charsPerSecond: v })}
-                    min={5}
-                    max={30}
-                    step={1}
-                  />
-                </div>
-              </>
+              <div className="space-y-1">
+                <label className="text-[9px] text-muted-foreground">Chars/sec: {project.lyrics.charsPerSecond}</label>
+                <Slider
+                  value={[project.lyrics.charsPerSecond]}
+                  onValueChange={([v]) => onLyricsChange({ charsPerSecond: v })}
+                  min={5}
+                  max={30}
+                  step={1}
+                />
+              </div>
             )}
-          </div>
+          </Section>
         )}
 
         {/* Text Section */}
@@ -332,8 +265,8 @@ export function RightEditorPanel({
                 />
                 <div className="flex items-center justify-between mt-1">
                   <div className="flex gap-1">
-                    <button onClick={() => setActivePageIndex((i) => Math.max(0, i - 1))} disabled={safeActivePageIndex === 0} className="px-1.5 py-0.5 text-[9px] border border-border bg-card hover:bg-excel-hover rounded disabled:opacity-50">←</button>
-                    <button onClick={() => setActivePageIndex((i) => Math.min(effectivePages.length - 1, i + 1))} disabled={safeActivePageIndex >= effectivePages.length - 1} className="px-1.5 py-0.5 text-[9px] border border-border bg-card hover:bg-excel-hover rounded disabled:opacity-50">→</button>
+                    <button onClick={() => setActivePageIndex((i) => Math.max(0, i - 1))} disabled={safeActivePageIndex === 0} className="px-1.5 py-0.5 text-[9px] border border-border bg-card hover:bg-muted/50 rounded disabled:opacity-50 transition-colors">←</button>
+                    <button onClick={() => setActivePageIndex((i) => Math.min(effectivePages.length - 1, i + 1))} disabled={safeActivePageIndex >= effectivePages.length - 1} className="px-1.5 py-0.5 text-[9px] border border-border bg-card hover:bg-muted/50 rounded disabled:opacity-50 transition-colors">→</button>
                   </div>
                   {activePageText.length >= pagedCharLimit && (
                     <button
@@ -346,7 +279,7 @@ export function RightEditorPanel({
                         });
                         setActivePageIndex(nextPages.length - 1);
                       }}
-                      className="px-1.5 py-0.5 text-[9px] border border-primary bg-primary/10 text-primary rounded"
+                      className="px-1.5 py-0.5 text-[9px] border border-primary bg-primary/10 text-primary rounded hover:bg-primary/20 transition-colors"
                     >+</button>
                   )}
                 </div>
@@ -400,23 +333,23 @@ export function RightEditorPanel({
                 </SelectContent>
               </Select>
             </div>
-            <div>
-              <label className="text-[9px] font-medium text-muted-foreground mb-1 block">Size: {project.text.fontSize}</label>
+            <div className="space-y-1">
+              <label className="text-[9px] font-medium text-muted-foreground block">Size: {project.text.fontSize}</label>
               <Slider value={[project.text.fontSize]} onValueChange={([v]) => onTextChange({ fontSize: v })} min={20} max={160} step={1} />
             </div>
           </div>
 
           {/* Style buttons */}
           <div className="flex gap-0.5">
-            <button onClick={() => onTextChange({ isBold: !project.text.isBold })} className={cn('flex-1 flex items-center justify-center py-1 border excel-hover', project.text.isBold ? 'border-primary bg-excel-selected border-2' : 'border-border')}>
+            <button onClick={() => onTextChange({ isBold: !project.text.isBold })} className={cn('flex-1 flex items-center justify-center py-1 border rounded transition-colors', project.text.isBold ? 'border-primary bg-primary/10 border-2' : 'border-border hover:bg-muted/50')}>
               <Bold className="w-3 h-3" />
             </button>
-            <button onClick={() => onTextChange({ isItalic: !project.text.isItalic })} className={cn('flex-1 flex items-center justify-center py-1 border excel-hover', project.text.isItalic ? 'border-primary bg-excel-selected border-2' : 'border-border')}>
+            <button onClick={() => onTextChange({ isItalic: !project.text.isItalic })} className={cn('flex-1 flex items-center justify-center py-1 border rounded transition-colors', project.text.isItalic ? 'border-primary bg-primary/10 border-2' : 'border-border hover:bg-muted/50')}>
               <Italic className="w-3 h-3" />
             </button>
             <div className="w-px bg-border" />
             {[{ value: 'left' as const, icon: AlignLeft }, { value: 'center' as const, icon: AlignCenter }, { value: 'right' as const, icon: AlignRight }].map(({ value, icon: Icon }) => (
-              <button key={value} onClick={() => onTextChange({ textAlign: value })} className={cn('flex-1 flex items-center justify-center py-1 border excel-hover', project.text.textAlign === value ? 'border-primary bg-excel-selected border-2' : 'border-border')}>
+              <button key={value} onClick={() => onTextChange({ textAlign: value })} className={cn('flex-1 flex items-center justify-center py-1 border rounded transition-colors', project.text.textAlign === value ? 'border-primary bg-primary/10 border-2' : 'border-border hover:bg-muted/50')}>
                 <Icon className="w-3 h-3" />
               </button>
             ))}
@@ -425,31 +358,34 @@ export function RightEditorPanel({
           {/* Vertical align */}
           <div className="flex gap-0.5">
             {[{ value: 'top' as const, icon: AlignVerticalJustifyStart }, { value: 'center' as const, icon: AlignVerticalJustifyCenter }, { value: 'bottom' as const, icon: AlignVerticalJustifyEnd }].map(({ value, icon: Icon }) => (
-              <button key={value} onClick={() => onTextChange({ verticalAlign: value })} className={cn('flex-1 flex items-center justify-center py-1 border excel-hover', project.text.verticalAlign === value ? 'border-primary bg-excel-selected border-2' : 'border-border')}>
+              <button key={value} onClick={() => onTextChange({ verticalAlign: value })} className={cn('flex-1 flex items-center justify-center py-1 border rounded transition-colors', project.text.verticalAlign === value ? 'border-primary bg-primary/10 border-2' : 'border-border hover:bg-muted/50')}>
                 <Icon className="w-3 h-3" />
               </button>
             ))}
           </div>
 
           {/* Color */}
-          <div className="flex items-center gap-1.5">
-            <input type="color" value={project.text.color} onChange={(e) => onTextChange({ color: e.target.value })} className="w-5 h-5 border border-border cursor-pointer" />
-            {['#ffffff', '#000000', '#ff6b6b', '#4ecdc4', '#ffe66d'].map((color) => (
-              <button key={color} onClick={() => onTextChange({ color })} className={cn('w-4 h-4 rounded border hover:scale-110', project.text.color === color ? 'border-primary border-2' : 'border-border')} style={{ backgroundColor: color }} />
-            ))}
+          <div className="space-y-1">
+            <label className="text-[8px] text-muted-foreground">Color</label>
+            <div className="flex items-center gap-1 flex-wrap">
+              <input type="color" value={project.text.color} onChange={(e) => onTextChange({ color: e.target.value })} className="w-5 h-5 border border-border cursor-pointer rounded" />
+              {TEXT_COLORS.map((color) => (
+                <button key={color} onClick={() => onTextChange({ color })} className={cn('w-4 h-4 rounded border transition-transform hover:scale-110', project.text.color === color ? 'border-primary border-2 ring-1 ring-primary/50' : 'border-border/50')} style={{ backgroundColor: color }} />
+              ))}
+            </div>
           </div>
 
           {/* Spacing */}
           <div className="grid grid-cols-3 gap-1">
-            <div>
+            <div className="space-y-1">
               <label className="text-[8px] text-muted-foreground">Line</label>
               <Slider value={[project.text.lineHeight]} onValueChange={([v]) => onTextChange({ lineHeight: v })} min={1} max={3} step={0.1} />
             </div>
-            <div>
+            <div className="space-y-1">
               <label className="text-[8px] text-muted-foreground">Letter</label>
               <Slider value={[project.text.letterSpacing]} onValueChange={([v]) => onTextChange({ letterSpacing: v })} min={-2} max={10} step={0.5} />
             </div>
-            <div>
+            <div className="space-y-1">
               <label className="text-[8px] text-muted-foreground">Width</label>
               <Slider value={[project.text.containerWidth]} onValueChange={([v]) => onTextChange({ containerWidth: v })} min={50} max={100} step={5} />
             </div>
@@ -477,14 +413,14 @@ export function RightEditorPanel({
           {/* Direction */}
           <div className="grid grid-cols-3 gap-1">
             {[{ value: 'up' as const, label: '↑' }, { value: 'left' as const, label: '←' }, { value: 'right' as const, label: '→' }].map(({ value, label }) => (
-              <button key={value} onClick={() => onAnimationChange({ direction: value })} className={cn('py-1 rounded text-[10px] font-medium', project.animation.direction === value ? 'bg-secondary text-secondary-foreground' : 'bg-muted/50 text-muted-foreground hover:bg-muted')}>
+              <button key={value} onClick={() => onAnimationChange({ direction: value })} className={cn('py-1.5 rounded text-[10px] font-medium transition-colors', project.animation.direction === value ? 'bg-primary text-primary-foreground' : 'bg-muted/50 text-muted-foreground hover:bg-muted')}>
                 {label}
               </button>
             ))}
           </div>
 
           {/* WPM Display */}
-          <div className="p-1.5 rounded bg-muted/30 space-y-1.5">
+          <div className="p-2 rounded bg-muted/30 space-y-2">
             <div className="flex items-center justify-between">
               <span className="text-[9px] font-medium">Speed</span>
               <div className="flex items-center gap-1">
@@ -495,15 +431,15 @@ export function RightEditorPanel({
               </div>
             </div>
             
-            <div className="grid grid-cols-2 gap-0.5">
+            <div className="grid grid-cols-2 gap-1">
               {(Object.keys(WPM_PRESETS) as WPMPreset[]).filter(p => p !== 'custom').map((preset) => (
-                <button key={preset} onClick={() => onAnimationChange({ wpmPreset: preset })} className={cn('py-0.5 rounded text-[9px] font-medium', project.animation.wpmPreset === preset ? 'bg-primary text-primary-foreground' : 'bg-muted/50 text-muted-foreground hover:bg-muted')}>
+                <button key={preset} onClick={() => onAnimationChange({ wpmPreset: preset })} className={cn('py-1 rounded text-[9px] font-medium transition-colors', project.animation.wpmPreset === preset ? 'bg-primary text-primary-foreground' : 'bg-muted/50 text-muted-foreground hover:bg-muted')}>
                   {WPM_PRESETS[preset].label}
                 </button>
               ))}
             </div>
 
-            <div className="text-center py-0.5 px-1.5 rounded bg-primary/5 border border-primary/20">
+            <div className="text-center py-1 px-2 rounded bg-primary/5 border border-primary/20">
               <span className="text-[9px] text-muted-foreground">Duration: </span>
               <span className="text-[10px] font-bold text-primary">{timeline.contentDuration}s</span>
             </div>
@@ -512,16 +448,16 @@ export function RightEditorPanel({
           {/* Manual Override */}
           <div className="flex items-center justify-between">
             <span className="text-[9px]">Manual</span>
-            <button onClick={() => onAnimationChange({ wpmPreset: 'custom' })} className={cn('text-[8px] px-1 py-0.5 rounded', project.animation.wpmPreset === 'custom' ? 'bg-primary text-primary-foreground' : 'bg-muted/50 text-muted-foreground')}>
+            <button onClick={() => onAnimationChange({ wpmPreset: 'custom' })} className={cn('text-[8px] px-1.5 py-0.5 rounded transition-colors', project.animation.wpmPreset === 'custom' ? 'bg-primary text-primary-foreground' : 'bg-muted/50 text-muted-foreground hover:bg-muted')}>
               Custom
             </button>
           </div>
           
           {project.animation.wpmPreset === 'custom' && (
             <>
-              <div className="flex flex-wrap gap-0.5">
+              <div className="flex flex-wrap gap-1">
                 {durationPresets.map((preset) => (
-                  <button key={preset} onClick={() => onAnimationChange({ duration: preset })} className={cn('px-1.5 py-0.5 rounded text-[9px]', project.animation.duration === preset ? 'bg-primary text-primary-foreground' : 'bg-muted/50 text-muted-foreground')}>
+                  <button key={preset} onClick={() => onAnimationChange({ duration: preset })} className={cn('px-2 py-1 rounded text-[9px] transition-colors', project.animation.duration === preset ? 'bg-primary text-primary-foreground' : 'bg-muted/50 text-muted-foreground hover:bg-muted')}>
                     {preset}s
                   </button>
                 ))}
@@ -538,82 +474,6 @@ export function RightEditorPanel({
             </div>
             <Switch checked={project.animation.isLooping} onCheckedChange={(checked) => onAnimationChange({ isLooping: checked })} />
           </div>
-        </Section>
-
-        {/* Title Section */}
-        <Section title="Title" icon={<Type className="w-3 h-3" />} defaultOpen={false} badge={project.titleOverlay.enabled ? 'ON' : undefined}>
-          <div className="flex items-center justify-between">
-            <span className="text-[9px] font-semibold">Enable</span>
-            <Switch checked={project.titleOverlay.enabled} onCheckedChange={(checked) => onTitleOverlayChange({ enabled: checked })} />
-          </div>
-
-          {project.titleOverlay.enabled && (
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-[9px]">Use Project Name</span>
-                <Switch checked={project.titleOverlay.useProjectName} onCheckedChange={(checked) => onTitleOverlayChange({ useProjectName: checked })} />
-              </div>
-
-              {!project.titleOverlay.useProjectName && (
-                <Input
-                  value={project.titleOverlay.content}
-                  onChange={(e) => onTitleOverlayChange({ content: e.target.value })}
-                  placeholder="Title..."
-                  className="h-6 text-[10px] border-border"
-                />
-              )}
-
-              {/* Title Font */}
-              <div>
-                <label className="text-[9px] text-muted-foreground mb-1 block">Font</label>
-                <Select value={project.titleOverlay.fontFamily} onValueChange={(v) => onTitleOverlayChange({ fontFamily: v })}>
-                  <SelectTrigger className="h-6 text-[9px] border-border">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent className="border-border max-h-[200px]">
-                    {FONT_FAMILIES.map((font) => (
-                      <SelectItem key={font.value} value={font.value} className="text-[10px]">
-                        <span style={{ fontFamily: font.value }}>{font.name}</span>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* Title Style */}
-              <div className="flex gap-0.5">
-                <button onClick={() => onTitleOverlayChange({ isBold: !project.titleOverlay.isBold })} className={cn('flex-1 flex items-center justify-center py-1 border excel-hover', project.titleOverlay.isBold ? 'border-primary bg-excel-selected border-2' : 'border-border')}>
-                  <Bold className="w-3 h-3" />
-                </button>
-                <button onClick={() => onTitleOverlayChange({ isItalic: !project.titleOverlay.isItalic })} className={cn('flex-1 flex items-center justify-center py-1 border excel-hover', project.titleOverlay.isItalic ? 'border-primary bg-excel-selected border-2' : 'border-border')}>
-                  <Italic className="w-3 h-3" />
-                </button>
-              </div>
-
-              {/* Size + Padding */}
-              <div className="grid grid-cols-2 gap-1">
-                <div>
-                  <label className="text-[8px] text-muted-foreground">Size: {project.titleOverlay.fontSize}</label>
-                  <Slider value={[project.titleOverlay.fontSize]} onValueChange={([v]) => onTitleOverlayChange({ fontSize: v })} min={14} max={96} step={2} />
-                </div>
-                <div>
-                  <label className="text-[8px] text-muted-foreground">Top: {project.titleOverlay.paddingY}</label>
-                  <Slider value={[project.titleOverlay.paddingY]} onValueChange={([v]) => onTitleOverlayChange({ paddingY: v })} min={0} max={120} step={2} />
-                </div>
-              </div>
-
-              {/* Title Colors */}
-              <div className="flex items-center gap-2">
-                <div className="flex items-center gap-1">
-                  <span className="text-[8px] text-muted-foreground">Text</span>
-                  <input type="color" value={project.titleOverlay.color} onChange={(e) => onTitleOverlayChange({ color: e.target.value })} className="w-5 h-5 border border-border cursor-pointer" />
-                </div>
-                {['#ffffff', '#000000', '#ff6b6b', '#4ecdc4', '#ffe66d'].map((color) => (
-                  <button key={color} onClick={() => onTitleOverlayChange({ color })} className={cn('w-3.5 h-3.5 rounded border hover:scale-110', project.titleOverlay.color === color ? 'border-primary border-2' : 'border-border')} style={{ backgroundColor: color }} />
-                ))}
-              </div>
-            </div>
-          )}
         </Section>
       </div>
     </ScrollArea>
