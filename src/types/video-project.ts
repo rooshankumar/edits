@@ -106,6 +106,15 @@ export interface OverlayTextSettings {
   backgroundColor: string;
 }
 
+export interface CutoutOverlaySettings {
+  enabled: boolean;
+  image: string | null;
+  opacity: number;
+  widthPercent: number;
+  offsetXPercent: number;
+  offsetYPercent: number;
+}
+
 export interface EndingSettings {
   enabled: boolean;
   duration: number;
@@ -157,6 +166,7 @@ export interface VideoProject {
   watermark: WatermarkSettings;
   titleOverlay: TitleOverlaySettings;
   overlay: OverlayTextSettings;
+  cutoutOverlay: CutoutOverlaySettings;
   ending: EndingSettings;
   createdAt: number;
   updatedAt: number;
@@ -315,6 +325,14 @@ export const DEFAULT_PROJECT: Omit<VideoProject, 'id' | 'createdAt' | 'updatedAt
     fontSize: 24,
     color: '#ffffff',
     backgroundColor: 'rgba(0,0,0,0.5)',
+  },
+  cutoutOverlay: {
+    enabled: false,
+    image: null,
+    opacity: 100,
+    widthPercent: 60,
+    offsetXPercent: 0,
+    offsetYPercent: 0,
   },
   ending: {
     enabled: false,

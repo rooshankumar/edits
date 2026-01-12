@@ -19,6 +19,12 @@ export default function Index() {
     setCanvasFormat, setTheme, saveProject, loadProject, deleteProject, newProject, duplicateProject,
   } = useVideoProject();
 
+  const updateCutoutOverlay = useCallback((updates: Partial<typeof project.cutoutOverlay>) => {
+    updateProject({
+      cutoutOverlay: { ...project.cutoutOverlay, ...updates },
+    });
+  }, [project.cutoutOverlay, updateProject]);
+
   const { exportState, exportVideo, cancelExport } = useVideoExport();
   const previewRef = useRef<HTMLDivElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
@@ -156,18 +162,15 @@ export default function Index() {
       </header>
 
       <div className="flex-1 flex overflow-hidden min-h-0">
-        {/* Left Panel - Format, Theme, Title, BG, Audio, etc. */}
-        <aside className="hidden md:flex w-[180px] border-r border-border bg-excel-header shrink-0 overflow-hidden min-h-0 flex-col">
-          <LeftEditorPanel 
+        {/* Left Panel - Text, Lyrics, Animation */}
+        <aside className="hidden md:flex w-[240px] border-r border-border bg-excel-header shrink-0 overflow-hidden min-h-0 flex-col">
+          <RightEditorPanel 
             project={project} 
-            onBackgroundChange={updateBackground} 
-            onAudioChange={updateAudio} 
-            onWatermarkChange={updateWatermark} 
-            onOverlayChange={updateOverlay} 
-            onEndingChange={updateEnding}
-            onCanvasFormatChange={setCanvasFormat}
-            onThemeChange={setTheme}
-            onTitleOverlayChange={updateTitleOverlay}
+            timeline={timeline} 
+            onProjectChange={updateProject} 
+            onLyricsChange={updateLyrics} 
+            onTextChange={updateText} 
+            onAnimationChange={updateAnimation}
           />
         </aside>
 
@@ -189,15 +192,19 @@ export default function Index() {
           </div>
         </main>
 
-        {/* Right Panel - Text, Lyrics, Animation */}
-        <aside className="hidden md:flex w-[200px] border-l border-border bg-excel-header shrink-0 overflow-hidden min-h-0 flex-col">
-          <RightEditorPanel 
+        {/* Right Panel - Format, Theme, Title, BG, Audio, etc. */}
+        <aside className="hidden md:flex w-[220px] border-l border-border bg-excel-header shrink-0 overflow-hidden min-h-0 flex-col">
+          <LeftEditorPanel 
             project={project} 
-            timeline={timeline} 
-            onProjectChange={updateProject} 
-            onLyricsChange={updateLyrics} 
-            onTextChange={updateText} 
-            onAnimationChange={updateAnimation}
+            onBackgroundChange={updateBackground} 
+            onAudioChange={updateAudio} 
+            onWatermarkChange={updateWatermark} 
+            onOverlayChange={updateOverlay} 
+            onCutoutOverlayChange={updateCutoutOverlay}
+            onEndingChange={updateEnding}
+            onCanvasFormatChange={setCanvasFormat}
+            onThemeChange={setTheme}
+            onTitleOverlayChange={updateTitleOverlay}
           />
         </aside>
 
@@ -223,6 +230,7 @@ export default function Index() {
                 onAudioChange={updateAudio} 
                 onWatermarkChange={updateWatermark} 
                 onOverlayChange={updateOverlay} 
+                onCutoutOverlayChange={updateCutoutOverlay}
                 onEndingChange={updateEnding}
                 onCanvasFormatChange={setCanvasFormat}
                 onThemeChange={setTheme}

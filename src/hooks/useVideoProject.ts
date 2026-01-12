@@ -94,6 +94,7 @@ export function useVideoProject() {
           watermark: { ...DEFAULT_PROJECT.watermark, ...parsed.watermark },
           titleOverlay: { ...DEFAULT_PROJECT.titleOverlay, ...parsed.titleOverlay },
           overlay: { ...DEFAULT_PROJECT.overlay, ...parsed.overlay },
+          cutoutOverlay: { ...DEFAULT_PROJECT.cutoutOverlay, ...parsed.cutoutOverlay },
           ending: { ...DEFAULT_PROJECT.ending, ...parsed.ending },
           id: parsed.id || generateId(),
           createdAt: parsed.createdAt || Date.now(),
@@ -128,6 +129,7 @@ export function useVideoProject() {
           watermark: { ...DEFAULT_PROJECT.watermark, ...p.watermark },
           titleOverlay: { ...DEFAULT_PROJECT.titleOverlay, ...p.titleOverlay },
           overlay: { ...DEFAULT_PROJECT.overlay, ...p.overlay },
+          cutoutOverlay: { ...DEFAULT_PROJECT.cutoutOverlay, ...p.cutoutOverlay },
           ending: { ...DEFAULT_PROJECT.ending, ...p.ending },
           id: p.id || generateId(),
           createdAt: p.createdAt || Date.now(),
@@ -339,6 +341,7 @@ export function useVideoProject() {
         watermark: { ...DEFAULT_PROJECT.watermark, ...found.watermark },
         titleOverlay: { ...DEFAULT_PROJECT.titleOverlay, ...found.titleOverlay },
         overlay: { ...DEFAULT_PROJECT.overlay, ...found.overlay },
+        cutoutOverlay: { ...DEFAULT_PROJECT.cutoutOverlay, ...found.cutoutOverlay },
         ending: { ...DEFAULT_PROJECT.ending, ...found.ending },
       }));
     }

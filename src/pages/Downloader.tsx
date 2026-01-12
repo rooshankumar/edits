@@ -20,7 +20,6 @@ export default function Downloader() {
       /youtu\.be\//i,
       /youtube\.com\/watch/i,
       /instagram\.com\/(reel|p)\//i,
-      /tiktok\.com\//i,
     ];
     return patterns.some(p => p.test(input));
   };
@@ -32,7 +31,7 @@ export default function Downloader() {
     }
 
     if (!isValidUrl(url)) {
-      setError('Please enter a valid YouTube, Instagram, or TikTok URL');
+      setError('Please enter a valid YouTube or Instagram URL');
       return;
     }
 
@@ -42,8 +41,7 @@ export default function Downloader() {
     setDownloadUrl('');
 
     try {
-      // Use Cobalt API (free, open-source)
-      const response = await fetch('https://api.cobalt.tools/api/json', {
+      const response = await fetch('/api/download', {
         method: 'POST',
         headers: {
           'Accept': 'application/json',
@@ -51,55 +49,34 @@ export default function Downloader() {
         },
         body: JSON.stringify({
           url: url.trim(),
-          vCodec: 'h264',
-          vQuality: 'max',
-          aFormat: 'mp3',
-          filenamePattern: 'basic',
-          isAudioOnly: format === 'mp3',
-          disableMetadata: false,
+          format,
         }),
       });
 
       setProgress(40);
 
-      if (!response.ok) {
-        throw new Error('Failed to fetch download link');
-      }
-
-      const data = await response.json();
+      const data = await response.json().catch(() => null);
       setProgress(60);
 
-      if (data.status === 'error') {
-        throw new Error(data.text || 'Download failed');
+      if (!response.ok) {
+        throw new Error((data && (data.error || data.message)) || 'Failed to fetch download link');
       }
 
-      if (data.status === 'redirect' || data.status === 'stream') {
-        setStatus('downloading');
-        setProgress(80);
-        
-        const downloadLink = data.url;
-        
-        setDownloadUrl(downloadLink);
-        setProgress(100);
-        setStatus('complete');
-        
-        // Auto-trigger download
-        window.open(downloadLink, '_blank');
-      } else if (data.status === 'picker') {
-        // Multiple options available, use first one
-        if (data.picker && data.picker.length > 0) {
-          const firstOption = data.picker[0];
-          setDownloadUrl(firstOption.url);
-          setProgress(100);
-          setStatus('complete');
-          
-          window.open(firstOption.url, '_blank');
-        } else {
-          throw new Error('No download options available');
-        }
-      } else {
-        throw new Error('Unexpected response from server');
+      if (!data || !data.downloadUrl) {
+        throw new Error('No download URL returned by server');
       }
+
+      setStatus('downloading');
+      setProgress(80);
+
+      const downloadLink = data.downloadUrl as string;
+
+      setDownloadUrl(downloadLink);
+      setProgress(100);
+      setStatus('complete');
+
+      // Auto-trigger download
+      window.open(downloadLink, '_blank');
     } catch (err) {
       setStatus('error');
       setProgress(0);
@@ -137,7 +114,7 @@ export default function Downloader() {
             </div>
             <h2 className="text-xl font-bold">Download Videos & Audio</h2>
             <p className="text-sm text-muted-foreground">
-              YouTube, Instagram, TikTok & more
+              YouTube & Instagram
             </p>
           </div>
 
@@ -246,8 +223,6 @@ export default function Downloader() {
               <span>YouTube</span>
               <span>•</span>
               <span>Instagram</span>
-              <span>•</span>
-              <span>TikTok</span>
             </div>
           </div>
 

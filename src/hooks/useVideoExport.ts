@@ -100,20 +100,54 @@ export function useVideoExport() {
       // Preload images
       let bgImage: HTMLImageElement | null = null;
       let watermarkImage: HTMLImageElement | null = null;
+      let cutoutImage: HTMLImageElement | null = null;
       let endingLogo: HTMLImageElement | null = null;
       let endingQR: HTMLImageElement | null = null;
 
       const loadImage = (src: string): Promise<HTMLImageElement> => new Promise((resolve) => {
         const img = new Image();
+        // Helps when sources are not data URLs (remote URLs / blob URLs)
+        img.crossOrigin = 'anonymous';
         img.onload = () => resolve(img);
         img.onerror = () => resolve(img);
         img.src = src;
       });
 
+      const waitForImageDecode = async (img: HTMLImageElement | null, timeoutMs: number = 1500) => {
+        if (!img) return;
+        if (img.complete && img.naturalWidth > 0) return;
+        const decodePromise = (img as any).decode?.() as Promise<void> | undefined;
+        const settle = (p: Promise<any>) => Promise.race([
+          p.catch(() => {}),
+          new Promise<void>((resolve) => setTimeout(resolve, timeoutMs)),
+        ]);
+        if (decodePromise) {
+          await settle(decodePromise);
+          return;
+        }
+        await settle(new Promise<void>((resolve) => {
+          const onDone = () => {
+            img.removeEventListener('load', onDone);
+            img.removeEventListener('error', onDone);
+            resolve();
+          };
+          img.addEventListener('load', onDone);
+          img.addEventListener('error', onDone);
+        }));
+      };
+
       if (project.background.image) bgImage = await loadImage(project.background.image);
       if (project.watermark.enabled && project.watermark.image) watermarkImage = await loadImage(project.watermark.image);
+      if (project.cutoutOverlay?.enabled && project.cutoutOverlay.image) cutoutImage = await loadImage(project.cutoutOverlay.image);
       if (project.ending.enabled && project.ending.showLogo && project.ending.logo) endingLogo = await loadImage(project.ending.logo);
       if (project.ending.enabled && project.ending.showQR && project.ending.qrCode) endingQR = await loadImage(project.ending.qrCode);
+
+      // Ensure images are actually ready before we start rendering frames.
+      await waitForImageDecode(bgImage);
+      await waitForImageDecode(watermarkImage);
+      await waitForImageDecode(cutoutImage);
+      await waitForImageDecode(endingLogo);
+      await waitForImageDecode(endingQR);
 
       const karaokeLrcForScaling = (project.theme === 'lyrics' && project.lyrics.timingSource === 'lrc' && project.lyrics.karaokeLrc.trim().length > 0)
         ? parseKaraokeLrc(project.lyrics.karaokeLrc)
@@ -318,6 +352,45 @@ export function useVideoExport() {
           const x = (width - bgImage.width * scale) / 2;
           const y = (height - bgImage.height * scale) / 2;
           ctx.drawImage(bgImage, x, y, bgImage.width * scale, bgImage.height * scale);
+          ctx.restore();
+        }
+
+        // Cutout overlay - part of background (visible throughout), behind lyrics/text
+        if (project.cutoutOverlay?.enabled && cutoutImage) {
+          if (!(cutoutImage.complete && cutoutImage.naturalWidth > 0)) {
+            if (frameIndex === 0) {
+              console.warn('Cutout overlay enabled but image not ready for export draw', {
+                complete: cutoutImage.complete,
+                naturalWidth: cutoutImage.naturalWidth,
+                naturalHeight: cutoutImage.naturalHeight,
+              });
+            }
+          }
+
+          ctx.save();
+          ctx.globalAlpha = Math.max(0, Math.min(1, project.cutoutOverlay.opacity / 100));
+          const wPct = Math.max(1, project.cutoutOverlay.widthPercent ?? 60);
+          const drawW = (width * wPct) / 100;
+          const safeW = Math.max(1, cutoutImage.naturalWidth || cutoutImage.width || 1);
+          const safeH = Math.max(1, cutoutImage.naturalHeight || cutoutImage.height || 1);
+          const aspect = safeW / safeH;
+          const drawH = drawW / aspect;
+
+          // Preview uses CSS transforms:
+          // translateX(calc(-50% + offsetXPercent%)) translateY(offsetYPercent%)
+          // where % values are relative to the element's own size.
+          const offsetXPx = ((project.cutoutOverlay.offsetXPercent ?? 0) / 100) * drawW;
+          const offsetYPx = ((project.cutoutOverlay.offsetYPercent ?? 0) / 100) * drawH;
+
+          const x = (width - drawW) / 2 + offsetXPx;
+          const y = (height - drawH) + offsetYPx;
+          try {
+            ctx.drawImage(cutoutImage, x, y, drawW, drawH);
+          } catch (e) {
+            if (frameIndex === 0) {
+              console.warn('Failed to draw cutout overlay image during export', e);
+            }
+          }
           ctx.restore();
         }
 

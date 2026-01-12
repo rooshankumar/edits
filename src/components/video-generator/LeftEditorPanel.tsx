@@ -5,7 +5,7 @@ import {
 } from 'lucide-react';
 import { 
   VideoProject, BackgroundSettings, AudioSettings,
-  WatermarkSettings, OverlayTextSettings, EndingSettings, TitleOverlaySettings,
+  WatermarkSettings, OverlayTextSettings, EndingSettings, TitleOverlaySettings, CutoutOverlaySettings,
   CANVAS_SIZES, CanvasFormat, VideoTheme, FONT_FAMILIES
 } from '@/types/video-project';
 import { useState, useRef } from 'react';
@@ -17,6 +17,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { AudioControls } from './AudioControls';
 import { WatermarkControls } from './WatermarkControls';
 import { OverlayControls } from './OverlayControls';
+import { CutoutOverlayControls } from './CutoutOverlayControls';
 import { EndingControls } from './EndingControls';
 import { cn } from '@/lib/utils';
 
@@ -26,6 +27,7 @@ interface LeftEditorPanelProps {
   onAudioChange: (updates: Partial<AudioSettings>) => void;
   onWatermarkChange: (updates: Partial<WatermarkSettings>) => void;
   onOverlayChange: (updates: Partial<OverlayTextSettings>) => void;
+  onCutoutOverlayChange: (updates: Partial<CutoutOverlaySettings>) => void;
   onEndingChange: (updates: Partial<EndingSettings>) => void;
   onCanvasFormatChange: (format: CanvasFormat) => void;
   onThemeChange: (theme: VideoTheme) => void;
@@ -102,6 +104,7 @@ export function LeftEditorPanel({
   onAudioChange,
   onWatermarkChange,
   onOverlayChange,
+  onCutoutOverlayChange,
   onEndingChange,
   onCanvasFormatChange,
   onThemeChange,
@@ -345,6 +348,11 @@ export function LeftEditorPanel({
         {/* OVERLAY Section */}
         <Section title="Over" icon={<Layers className="w-3 h-3" />} badge={project.overlay.enabled ? 'ON' : undefined}>
           <OverlayControls settings={project.overlay} onChange={onOverlayChange} />
+        </Section>
+
+        {/* CUTOUT Section */}
+        <Section title="Cut" icon={<Layers className="w-3 h-3" />} badge={project.cutoutOverlay.enabled ? 'ON' : undefined}>
+          <CutoutOverlayControls settings={project.cutoutOverlay} onChange={onCutoutOverlayChange} />
         </Section>
 
         {/* ENDING Section */}

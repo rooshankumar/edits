@@ -482,8 +482,27 @@ export const VideoPreview = forwardRef<HTMLDivElement, VideoPreviewProps>(
                 }} />
             )}
 
+            {/* Cutout Overlay - part of background (visible throughout, behind text/ending card) */}
+            {project.cutoutOverlay?.enabled && project.cutoutOverlay.image && (
+              <div
+                className="absolute left-1/2 bottom-0 z-5 pointer-events-none"
+                style={{
+                  transform: `translateX(calc(-50% + ${project.cutoutOverlay.offsetXPercent}%)) translateY(${project.cutoutOverlay.offsetYPercent}%)`,
+                  width: `${project.cutoutOverlay.widthPercent}%`,
+                  opacity: project.cutoutOverlay.opacity / 100,
+                }}
+              >
+                <img
+                  src={project.cutoutOverlay.image}
+                  alt=""
+                  className="w-full h-auto object-contain"
+                />
+              </div>
+            )}
+
             {/* Scrolling Text or Ending with smooth transition */}
             {!scrollState.isEnding ? (
+              <>
               <div 
                 ref={containerRef} 
                 className={cn('absolute inset-0 overflow-hidden flex',
@@ -511,6 +530,7 @@ export const VideoPreview = forwardRef<HTMLDivElement, VideoPreviewProps>(
                   </div>
                 )}
               </div>
+              </>
             ) : (
               <div 
                 className="absolute inset-0 flex flex-col items-center justify-center gap-4 p-8"
