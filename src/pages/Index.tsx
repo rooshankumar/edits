@@ -156,9 +156,19 @@ export default function Index() {
       </header>
 
       <div className="flex-1 flex overflow-hidden min-h-0">
-        {/* Left Panel - Secondary Controls */}
-        <aside className="hidden md:flex w-[160px] border-r border-border bg-excel-header shrink-0 overflow-hidden min-h-0 flex-col">
-          <LeftEditorPanel project={project} onBackgroundChange={updateBackground} onAudioChange={updateAudio} onWatermarkChange={updateWatermark} onOverlayChange={updateOverlay} onEndingChange={updateEnding} />
+        {/* Left Panel - Format, Theme, Title, BG, Audio, etc. */}
+        <aside className="hidden md:flex w-[180px] border-r border-border bg-excel-header shrink-0 overflow-hidden min-h-0 flex-col">
+          <LeftEditorPanel 
+            project={project} 
+            onBackgroundChange={updateBackground} 
+            onAudioChange={updateAudio} 
+            onWatermarkChange={updateWatermark} 
+            onOverlayChange={updateOverlay} 
+            onEndingChange={updateEnding}
+            onCanvasFormatChange={setCanvasFormat}
+            onThemeChange={setTheme}
+            onTitleOverlayChange={updateTitleOverlay}
+          />
         </aside>
 
         {/* Main Preview Area */}
@@ -171,7 +181,7 @@ export default function Index() {
               <TimelineBar currentTime={currentTime} duration={timeline.totalDuration} isPlaying={isPlaying} onSeek={handleSeek} />
             </div>
             <div className="flex flex-col sm:flex-row items-center justify-center gap-2">
-              <button onClick={() => setShowMobileEditor(!showMobileEditor)} className="md:hidden px-3 py-1.5 text-[10px] font-medium border border-border bg-card hover:bg-excel-hover rounded">
+              <button onClick={() => setShowMobileEditor(!showMobileEditor)} className="md:hidden px-3 py-1.5 text-[10px] font-medium border border-border bg-card hover:bg-excel-hover rounded transition-colors">
                 {showMobileEditor ? 'Hide' : 'Show'} Editor
               </button>
               <PlaybackControls isPlaying={isPlaying} onPlayPause={handlePlayPause} onReset={handleReset} onExport={() => setShowExportDialog(true)} isExporting={exportState.isExporting} exportProgress={exportState.progress} />
@@ -179,9 +189,16 @@ export default function Index() {
           </div>
         </main>
 
-        {/* Right Panel - Core Controls */}
-        <aside className="hidden md:flex w-[220px] border-l border-border bg-excel-header shrink-0 overflow-hidden min-h-0 flex-col">
-          <RightEditorPanel project={project} timeline={timeline} onProjectChange={updateProject} onThemeChange={setTheme} onLyricsChange={updateLyrics} onCanvasFormatChange={setCanvasFormat} onTextChange={updateText} onAnimationChange={updateAnimation} onTitleOverlayChange={updateTitleOverlay} />
+        {/* Right Panel - Text, Lyrics, Animation */}
+        <aside className="hidden md:flex w-[200px] border-l border-border bg-excel-header shrink-0 overflow-hidden min-h-0 flex-col">
+          <RightEditorPanel 
+            project={project} 
+            timeline={timeline} 
+            onProjectChange={updateProject} 
+            onLyricsChange={updateLyrics} 
+            onTextChange={updateText} 
+            onAnimationChange={updateAnimation}
+          />
         </aside>
 
       </div>
@@ -200,8 +217,25 @@ export default function Index() {
               </button>
             </div>
             <div className="flex-1 min-h-0 overflow-y-auto p-2 space-y-2">
-              <LeftEditorPanel project={project} onBackgroundChange={updateBackground} onAudioChange={updateAudio} onWatermarkChange={updateWatermark} onOverlayChange={updateOverlay} onEndingChange={updateEnding} />
-              <RightEditorPanel project={project} timeline={timeline} onProjectChange={updateProject} onThemeChange={setTheme} onLyricsChange={updateLyrics} onCanvasFormatChange={setCanvasFormat} onTextChange={updateText} onAnimationChange={updateAnimation} onTitleOverlayChange={updateTitleOverlay} />
+              <LeftEditorPanel 
+                project={project} 
+                onBackgroundChange={updateBackground} 
+                onAudioChange={updateAudio} 
+                onWatermarkChange={updateWatermark} 
+                onOverlayChange={updateOverlay} 
+                onEndingChange={updateEnding}
+                onCanvasFormatChange={setCanvasFormat}
+                onThemeChange={setTheme}
+                onTitleOverlayChange={updateTitleOverlay}
+              />
+              <RightEditorPanel 
+                project={project} 
+                timeline={timeline} 
+                onProjectChange={updateProject} 
+                onLyricsChange={updateLyrics} 
+                onTextChange={updateText} 
+                onAnimationChange={updateAnimation}
+              />
             </div>
           </div>
         </div>
