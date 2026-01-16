@@ -1,4 +1,4 @@
-import { Bold, Italic, AlignLeft, AlignCenter, AlignRight, AlignVerticalJustifyStart, AlignVerticalJustifyCenter, AlignVerticalJustifyEnd } from 'lucide-react';
+import { Bold, Italic, AlignLeft, AlignCenter, AlignRight, AlignVerticalJustifyStart, AlignVerticalJustifyCenter, AlignVerticalJustifyEnd, MoveHorizontal, MoveVertical } from 'lucide-react';
 import { TextSettings, FONT_FAMILIES } from '@/types/video-project';
 import { Textarea } from '@/components/ui/textarea';
 import { Slider } from '@/components/ui/slider';
@@ -10,9 +10,19 @@ interface TextControlsProps {
   onChange: (updates: Partial<TextSettings>) => void;
 }
 
+// Group fonts by category
+const fontCategories = [
+  { key: 'readable', label: 'Readable' },
+  { key: 'display', label: 'Display / Bold' },
+  { key: 'modern', label: 'Modern' },
+  { key: 'elegant', label: 'Elegant' },
+  { key: 'script', label: 'Script / Handwritten' },
+  { key: 'mono', label: 'Monospace' },
+];
+
 export function TextControls({ settings, onChange }: TextControlsProps) {
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       <h3 className="text-sm font-semibold text-foreground">Text Content</h3>
       
       {/* Text Input */}
@@ -21,26 +31,37 @@ export function TextControls({ settings, onChange }: TextControlsProps) {
           value={settings.content}
           onChange={(e) => onChange({ content: e.target.value })}
           placeholder="Enter your scrolling text..."
-          className="min-h-[120px] resize-none bg-muted/50 border-border focus:border-primary"
+          className="min-h-[100px] resize-none bg-muted/50 border-border focus:border-primary transition-colors"
         />
         <p className="text-xs text-muted-foreground text-right">
-          {settings.content.length} characters
+          {settings.content.length} chars · {settings.content.trim().split(/\s+/).filter(Boolean).length} words
         </p>
       </div>
 
-      {/* Font Family */}
+      {/* Font Family - Grouped */}
       <div className="space-y-2">
         <label className="text-xs font-medium text-muted-foreground">Font Family</label>
         <Select value={settings.fontFamily} onValueChange={(v) => onChange({ fontFamily: v })}>
-          <SelectTrigger className="bg-muted/50">
+          <SelectTrigger className="bg-muted/50 h-10">
             <SelectValue />
           </SelectTrigger>
-          <SelectContent>
-            {FONT_FAMILIES.map((font) => (
-              <SelectItem key={font.value} value={font.value}>
-                <span style={{ fontFamily: font.value }}>{font.name}</span>
-              </SelectItem>
-            ))}
+          <SelectContent className="max-h-[300px]">
+            {fontCategories.map((category) => {
+              const fonts = FONT_FAMILIES.filter((f) => f.category === category.key);
+              if (fonts.length === 0) return null;
+              return (
+                <div key={category.key}>
+                  <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground bg-muted/50 sticky top-0">
+                    {category.label}
+                  </div>
+                  {fonts.map((font) => (
+                    <SelectItem key={font.value} value={font.value}>
+                      <span style={{ fontFamily: font.value }}>{font.name}</span>
+                    </SelectItem>
+                  ))}
+                </div>
+              );
+            })}
           </SelectContent>
         </Select>
       </div>
@@ -66,7 +87,7 @@ export function TextControls({ settings, onChange }: TextControlsProps) {
         <button
           onClick={() => onChange({ isBold: !settings.isBold })}
           className={cn(
-            'flex-1 flex items-center justify-center gap-2 py-2 rounded-lg border-2 transition-all',
+            'flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg border-2 transition-all',
             settings.isBold
               ? 'border-primary bg-primary/10 text-primary'
               : 'border-border bg-muted/50 text-muted-foreground hover:border-primary/50'
@@ -78,7 +99,7 @@ export function TextControls({ settings, onChange }: TextControlsProps) {
         <button
           onClick={() => onChange({ isItalic: !settings.isItalic })}
           className={cn(
-            'flex-1 flex items-center justify-center gap-2 py-2 rounded-lg border-2 transition-all',
+            'flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg border-2 transition-all',
             settings.isItalic
               ? 'border-primary bg-primary/10 text-primary'
               : 'border-border bg-muted/50 text-muted-foreground hover:border-primary/50'
@@ -91,18 +112,19 @@ export function TextControls({ settings, onChange }: TextControlsProps) {
 
       {/* Text Alignment */}
       <div className="space-y-2">
-        <label className="text-xs font-medium text-muted-foreground">Alignment</label>
+        <label className="text-xs font-medium text-muted-foreground">Horizontal Alignment</label>
         <div className="flex gap-2">
           {[
-            { value: 'left' as const, icon: AlignLeft },
-            { value: 'center' as const, icon: AlignCenter },
-            { value: 'right' as const, icon: AlignRight },
-          ].map(({ value, icon: Icon }) => (
+            { value: 'left' as const, icon: AlignLeft, label: 'Left' },
+            { value: 'center' as const, icon: AlignCenter, label: 'Center' },
+            { value: 'right' as const, icon: AlignRight, label: 'Right' },
+          ].map(({ value, icon: Icon, label }) => (
             <button
               key={value}
               onClick={() => onChange({ textAlign: value })}
+              title={label}
               className={cn(
-                'flex-1 flex items-center justify-center py-2 rounded-lg border-2 transition-all',
+                'flex-1 flex items-center justify-center py-2.5 rounded-lg border-2 transition-all',
                 settings.textAlign === value
                   ? 'border-primary bg-primary/10 text-primary'
                   : 'border-border bg-muted/50 text-muted-foreground hover:border-primary/50'
@@ -116,18 +138,19 @@ export function TextControls({ settings, onChange }: TextControlsProps) {
 
       {/* Vertical Alignment */}
       <div className="space-y-2">
-        <label className="text-xs font-medium text-muted-foreground">Vertical</label>
+        <label className="text-xs font-medium text-muted-foreground">Vertical Alignment</label>
         <div className="flex gap-2">
           {[
-            { value: 'top' as const, icon: AlignVerticalJustifyStart },
-            { value: 'center' as const, icon: AlignVerticalJustifyCenter },
-            { value: 'bottom' as const, icon: AlignVerticalJustifyEnd },
-          ].map(({ value, icon: Icon }) => (
+            { value: 'top' as const, icon: AlignVerticalJustifyStart, label: 'Top' },
+            { value: 'center' as const, icon: AlignVerticalJustifyCenter, label: 'Middle' },
+            { value: 'bottom' as const, icon: AlignVerticalJustifyEnd, label: 'Bottom' },
+          ].map(({ value, icon: Icon, label }) => (
             <button
               key={value}
               onClick={() => onChange({ verticalAlign: value })}
+              title={label}
               className={cn(
-                'flex-1 flex items-center justify-center py-2 rounded-lg border-2 transition-all',
+                'flex-1 flex items-center justify-center py-2.5 rounded-lg border-2 transition-all',
                 settings.verticalAlign === value
                   ? 'border-primary bg-primary/10 text-primary'
                   : 'border-border bg-muted/50 text-muted-foreground hover:border-primary/50'
@@ -139,6 +162,63 @@ export function TextControls({ settings, onChange }: TextControlsProps) {
         </div>
       </div>
 
+      {/* Container Width */}
+      <div className="space-y-2">
+        <div className="flex justify-between items-center">
+          <label className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
+            <MoveHorizontal className="w-3.5 h-3.5" />
+            Text Width
+          </label>
+          <span className="text-xs font-mono text-primary">{settings.containerWidth}%</span>
+        </div>
+        <Slider
+          value={[settings.containerWidth]}
+          onValueChange={([v]) => onChange({ containerWidth: v })}
+          min={30}
+          max={100}
+          step={1}
+          className="py-2"
+        />
+      </div>
+
+      {/* Horizontal Padding */}
+      <div className="space-y-2">
+        <div className="flex justify-between items-center">
+          <label className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
+            <MoveHorizontal className="w-3.5 h-3.5" />
+            Horizontal Padding
+          </label>
+          <span className="text-xs font-mono text-primary">{settings.paddingX}%</span>
+        </div>
+        <Slider
+          value={[settings.paddingX]}
+          onValueChange={([v]) => onChange({ paddingX: v })}
+          min={0}
+          max={30}
+          step={1}
+          className="py-2"
+        />
+      </div>
+
+      {/* Vertical Padding */}
+      <div className="space-y-2">
+        <div className="flex justify-between items-center">
+          <label className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
+            <MoveVertical className="w-3.5 h-3.5" />
+            Vertical Padding
+          </label>
+          <span className="text-xs font-mono text-primary">{settings.paddingY}px</span>
+        </div>
+        <Slider
+          value={[settings.paddingY]}
+          onValueChange={([v]) => onChange({ paddingY: v })}
+          min={0}
+          max={150}
+          step={5}
+          className="py-2"
+        />
+      </div>
+
       {/* Line Height */}
       <div className="space-y-2">
         <div className="flex justify-between">
@@ -148,7 +228,7 @@ export function TextControls({ settings, onChange }: TextControlsProps) {
         <Slider
           value={[settings.lineHeight]}
           onValueChange={([v]) => onChange({ lineHeight: v })}
-          min={1}
+          min={0.8}
           max={3}
           step={0.1}
           className="py-2"
@@ -179,24 +259,32 @@ export function TextControls({ settings, onChange }: TextControlsProps) {
             type="color"
             value={settings.color}
             onChange={(e) => onChange({ color: e.target.value })}
-            className="w-12 h-10 rounded-lg border-2 border-border cursor-pointer"
+            className="w-12 h-10 rounded-lg border-2 border-border cursor-pointer bg-transparent"
           />
           <input
             type="text"
             value={settings.color}
             onChange={(e) => onChange({ color: e.target.value })}
-            className="flex-1 px-3 py-2 rounded-lg bg-muted/50 border border-border text-sm font-mono"
+            className="flex-1 px-3 py-2 rounded-lg bg-muted/50 border border-border text-sm font-mono focus:border-primary transition-colors"
           />
         </div>
         {/* Color Presets */}
-        <div className="flex gap-1.5 flex-wrap">
-          {['#ffffff', '#000000', '#ff6b6b', '#4ecdc4', '#ffe66d', '#a855f7', '#3b82f6', '#22c55e'].map((color) => (
+        <div className="flex gap-1.5 flex-wrap pt-1">
+          {[
+            '#ffffff', '#f8f9fa', '#e9ecef', '#dee2e6',
+            '#000000', '#212529', '#495057', '#6c757d',
+            '#ef4444', '#f97316', '#eab308', '#22c55e',
+            '#14b8a6', '#06b6d4', '#3b82f6', '#8b5cf6',
+            '#d946ef', '#ec4899', '#f43f5e', '#fbbf24',
+          ].map((color) => (
             <button
               key={color}
               onClick={() => onChange({ color })}
               className={cn(
                 'w-7 h-7 rounded-lg border-2 transition-all hover:scale-110',
-                settings.color === color ? 'border-primary ring-2 ring-primary/30' : 'border-border'
+                settings.color.toLowerCase() === color.toLowerCase() 
+                  ? 'border-primary ring-2 ring-primary/30' 
+                  : 'border-border/50'
               )}
               style={{ backgroundColor: color }}
             />
