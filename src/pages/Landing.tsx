@@ -1,6 +1,6 @@
 import { useNavigate } from 'react-router-dom';
-import { Video, Download, Sparkles, Music } from 'lucide-react';
-import { Card, CardContent } from '@/components/ui/card';
+import { Video, Sparkles, Palette, Type } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
 export default function Landing() {
   const navigate = useNavigate();
@@ -8,97 +8,57 @@ export default function Landing() {
   return (
     <div className="min-h-screen bg-background flex flex-col">
       {/* Header */}
-      <header className="h-12 flex items-center justify-between px-4 border-b border-border bg-card">
+      <header className="h-14 flex items-center justify-between px-6 border-b border-border bg-card">
         <div className="flex items-center gap-2">
-          <img src="/globe-favicon.png" alt="roshLingua Logo" className="h-7" />
-          <span className="text-sm font-bold text-foreground">editbyroshLingua</span>
+          <img src="/globe-favicon.png" alt="roshLingua Logo" className="h-8" />
+          <span className="text-base font-bold text-foreground">editbyroshLingua</span>
         </div>
       </header>
 
       {/* Hero Section */}
-      <main className="flex-1 flex flex-col items-center justify-center px-4 py-12">
-        <div className="text-center mb-12">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-medium mb-4">
-            <Sparkles className="w-3 h-3" />
-            Create stunning content
+      <main className="flex-1 flex flex-col items-center justify-center px-4 py-16">
+        <div className="text-center mb-12 max-w-2xl">
+          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-primary/10 text-primary text-sm font-medium mb-6">
+            <Sparkles className="w-4 h-4" />
+            Professional Video Editor
           </div>
-          <h1 className="text-3xl md:text-5xl font-bold text-foreground mb-4">
-            Video Tools for Creators
+          <h1 className="text-4xl md:text-6xl font-bold text-foreground mb-6 leading-tight">
+            Create Stunning<br />
+            <span className="text-primary">Scrolling Text Videos</span>
           </h1>
-          <p className="text-muted-foreground text-sm md:text-base max-w-md mx-auto">
-            Create professional lyrics videos and download media from your favorite platforms
+          <p className="text-muted-foreground text-lg md:text-xl max-w-lg mx-auto mb-8">
+            Design beautiful lyrics videos, social media reels, and scrolling text content with our powerful editor.
           </p>
-        </div>
-
-        {/* Tool Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-2xl w-full">
-          {/* Video Generator Card */}
-          <Card 
-            className="group cursor-pointer transition-all duration-300 hover:shadow-lg hover:scale-[1.02] hover:border-primary/50 border-2"
+          <Button 
+            size="lg" 
+            className="h-14 px-10 text-lg font-semibold"
             onClick={() => navigate('/editor')}
           >
-            <CardContent className="p-6 flex flex-col items-center text-center gap-4">
-              <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center group-hover:scale-110 transition-transform">
-                <Video className="w-8 h-8 text-primary" />
-              </div>
-              <div>
-                <h2 className="text-lg font-bold text-foreground mb-1">Video Generator</h2>
-                <p className="text-xs text-muted-foreground">
-                  Create scrolling text & lyrics videos for social media
-                </p>
-              </div>
-              <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
-                <span className="px-2 py-0.5 bg-muted rounded">Scroll</span>
-                <span className="px-2 py-0.5 bg-muted rounded">Karaoke</span>
-                <span className="px-2 py-0.5 bg-muted rounded">Export</span>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Media Downloader Card */}
-          <Card 
-            className="group cursor-pointer transition-all duration-300 hover:shadow-lg hover:scale-[1.02] hover:border-primary/50 border-2"
-            onClick={() => navigate('/downloader')}
-          >
-            <CardContent className="p-6 flex flex-col items-center text-center gap-4">
-              <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-green-500/20 to-green-500/5 flex items-center justify-center group-hover:scale-110 transition-transform">
-                <Download className="w-8 h-8 text-green-500" />
-              </div>
-              <div>
-                <h2 className="text-lg font-bold text-foreground mb-1">Media Downloader</h2>
-                <p className="text-xs text-muted-foreground">
-                  Download YouTube & Instagram videos as MP3 or MP4
-                </p>
-              </div>
-              <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
-                <span className="px-2 py-0.5 bg-muted rounded">YouTube</span>
-                <span className="px-2 py-0.5 bg-muted rounded">Instagram</span>
-                <span className="px-2 py-0.5 bg-muted rounded">MP3/MP4</span>
-              </div>
-            </CardContent>
-          </Card>
+            <Video className="w-5 h-5 mr-2" />
+            Open Editor
+          </Button>
         </div>
 
         {/* Features */}
-        <div className="mt-16 grid grid-cols-2 md:grid-cols-4 gap-6 max-w-2xl w-full text-center">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-4xl w-full mt-8">
           {[
-            { icon: Music, label: 'Karaoke Sync' },
-            { icon: Video, label: 'HD Export' },
-            { icon: Download, label: 'Fast Download' },
-            { icon: Sparkles, label: 'Easy to Use' },
-          ].map(({ icon: Icon, label }) => (
-            <div key={label} className="flex flex-col items-center gap-2">
-              <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center">
-                <Icon className="w-5 h-5 text-muted-foreground" />
+            { icon: Type, label: 'Custom Fonts', description: 'Choose from 25+ beautiful fonts with full control over size, spacing, and alignment' },
+            { icon: Palette, label: 'Rich Themes', description: 'Solid colors, images, and video backgrounds with blur and opacity controls' },
+            { icon: Video, label: 'HD Export', description: 'Export in multiple formats for TikTok, Instagram Reels, YouTube Shorts & more' },
+          ].map(({ icon: Icon, label, description }) => (
+            <div key={label} className="flex flex-col items-center text-center p-6 rounded-xl bg-card border border-border">
+              <div className="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center mb-4">
+                <Icon className="w-7 h-7 text-primary" />
               </div>
-              <span className="text-xs text-muted-foreground">{label}</span>
+              <h3 className="text-lg font-semibold text-foreground mb-2">{label}</h3>
+              <p className="text-sm text-muted-foreground">{description}</p>
             </div>
           ))}
         </div>
       </main>
 
       {/* Footer */}
-      <footer className="py-4 text-center text-xs text-muted-foreground border-t border-border">
+      <footer className="py-6 text-center text-sm text-muted-foreground border-t border-border">
         © 2025 editbyroshLingua. All rights reserved.
       </footer>
     </div>
