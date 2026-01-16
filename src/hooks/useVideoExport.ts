@@ -341,7 +341,28 @@ export function useVideoExport() {
         );
 
         // Background
-        ctx.fillStyle = project.background.color;
+        if (project.background.backgroundType === 'gradient') {
+          // Render gradient background
+          const colors = project.background.gradientColors || ['#1a1a2e', '#4a0080'];
+          let gradient: CanvasGradient;
+          
+          if (project.background.gradientDirection === 'radial') {
+            gradient = ctx.createRadialGradient(width / 2, height / 2, 0, width / 2, height / 2, Math.max(width, height) / 2);
+          } else if (project.background.gradientDirection === 'to-right') {
+            gradient = ctx.createLinearGradient(0, 0, width, 0);
+          } else if (project.background.gradientDirection === 'to-bottom-right') {
+            gradient = ctx.createLinearGradient(0, 0, width, height);
+          } else {
+            // to-bottom (default)
+            gradient = ctx.createLinearGradient(0, 0, 0, height);
+          }
+          
+          gradient.addColorStop(0, colors[0]);
+          gradient.addColorStop(1, colors[1]);
+          ctx.fillStyle = gradient;
+        } else {
+          ctx.fillStyle = project.background.color;
+        }
         ctx.fillRect(0, 0, width, height);
 
         if (bgImage?.complete && bgImage.naturalWidth > 0) {
@@ -725,10 +746,21 @@ export function useVideoExport() {
             ctx.font = `${project.text.isItalic ? 'italic ' : ''}${project.text.isBold ? 'bold ' : ''}${scaledFontSize}px ${project.text.fontFamily}`;
             ctx.textAlign = project.text.textAlign;
             
+            // Apply text shadow if enabled
+            if (project.text.textShadow?.enabled) {
+              ctx.shadowColor = project.text.textShadow.color;
+              ctx.shadowBlur = project.text.textShadow.blur;
+              ctx.shadowOffsetX = project.text.textShadow.offsetX;
+              ctx.shadowOffsetY = project.text.textShadow.offsetY;
+            }
+            
             // Apply letter spacing if supported
             if ((ctx as any).letterSpacing !== undefined && scaledSettings.letterSpacing !== 0) {
               (ctx as any).letterSpacing = `${scaledSettings.letterSpacing}px`;
             }
+            
+            // Text outline requires stroke + fill approach
+            const hasOutline = project.text.textOutline?.enabled;
 
             const containerWidth = (width * project.text.containerWidth) / 100;
 
@@ -795,6 +827,15 @@ export function useVideoExport() {
                     
                     ctx.save();
                     ctx.globalAlpha = transitionOpacity.contentOpacity * charOpacity;
+                    
+                    // Draw outline first if enabled
+                    if (hasOutline && project.text.textOutline) {
+                      ctx.strokeStyle = project.text.textOutline.color;
+                      ctx.lineWidth = project.text.textOutline.width * 2;
+                      ctx.lineJoin = 'round';
+                      ctx.strokeText(char, currentX, y);
+                    }
+                    
                     ctx.fillText(char, currentX, y);
                     ctx.restore();
                     
@@ -809,6 +850,13 @@ export function useVideoExport() {
               lines.forEach((line, i) => {
                 const y = scrollY + scaledPaddingY + i * lineHeight + lineHeight;
                 if (y > -lineHeight && y < height + lineHeight) {
+                  // Draw outline first if enabled
+                  if (hasOutline && project.text.textOutline) {
+                    ctx.strokeStyle = project.text.textOutline.color;
+                    ctx.lineWidth = project.text.textOutline.width * 2;
+                    ctx.lineJoin = 'round';
+                    ctx.strokeText(line, textX, y);
+                  }
                   ctx.fillText(line, textX, y);
                 }
               });
