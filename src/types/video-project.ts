@@ -14,6 +14,20 @@ export type WPMPreset = 'beginner' | 'average' | 'comfortable' | 'fast' | 'custo
 
 export type TextMode = 'scroll' | 'pages';
 
+export interface TextShadowSettings {
+  enabled: boolean;
+  offsetX: number;
+  offsetY: number;
+  blur: number;
+  color: string;
+}
+
+export interface TextOutlineSettings {
+  enabled: boolean;
+  width: number;
+  color: string;
+}
+
 export interface TextSettings {
   content: string;
   fontFamily: string;
@@ -30,6 +44,8 @@ export interface TextSettings {
   paddingY: number;
   containerWidth: number;
   waveAnimation: boolean;
+  textShadow: TextShadowSettings;
+  textOutline: TextOutlineSettings;
 }
 
 export interface TitleOverlaySettings {
@@ -64,8 +80,14 @@ export interface PagedTextSettings {
   sentences: SentenceTiming[];
 }
 
+export type BackgroundType = 'solid' | 'gradient';
+export type GradientDirection = 'to-bottom' | 'to-right' | 'to-bottom-right' | 'radial';
+
 export interface BackgroundSettings {
   color: string;
+  backgroundType: BackgroundType;
+  gradientColors: [string, string];
+  gradientDirection: GradientDirection;
   image: string | null;
   video: string | null;
   blur: number;
@@ -198,7 +220,11 @@ export const WPM_PRESETS: Record<WPMPreset, { label: string; wpm: number; descri
 };
 
 export const FONT_FAMILIES = [
-  // Readable
+  // System Fonts (Readable)
+  { name: 'Verdana', value: 'Verdana, Geneva, sans-serif', category: 'readable' },
+  { name: 'Arial', value: 'Arial, Helvetica, sans-serif', category: 'readable' },
+  { name: 'Tahoma', value: 'Tahoma, Geneva, sans-serif', category: 'readable' },
+  // Google Fonts (Readable)
   { name: 'Inter', value: 'Inter, sans-serif', category: 'readable' },
   { name: 'Poppins', value: 'Poppins, sans-serif', category: 'readable' },
   { name: 'Montserrat', value: 'Montserrat, sans-serif', category: 'readable' },
@@ -206,6 +232,13 @@ export const FONT_FAMILIES = [
   { name: 'Roboto', value: 'Roboto, sans-serif', category: 'readable' },
   { name: 'Raleway', value: 'Raleway, sans-serif', category: 'readable' },
   { name: 'Quicksand', value: 'Quicksand, sans-serif', category: 'readable' },
+  { name: 'Source Sans 3', value: 'Source Sans 3, sans-serif', category: 'readable' },
+  { name: 'Nunito', value: 'Nunito, sans-serif', category: 'readable' },
+  { name: 'Work Sans', value: 'Work Sans, sans-serif', category: 'readable' },
+  { name: 'Fira Sans', value: 'Fira Sans, sans-serif', category: 'readable' },
+  { name: 'Lexend', value: 'Lexend, sans-serif', category: 'readable' },
+  { name: 'Barlow', value: 'Barlow, sans-serif', category: 'readable' },
+  { name: 'Archivo', value: 'Archivo, sans-serif', category: 'readable' },
   // Display/Bold
   { name: 'Bebas Neue', value: 'Bebas Neue, sans-serif', category: 'display' },
   { name: 'Righteous', value: 'Righteous, sans-serif', category: 'display' },
@@ -226,6 +259,10 @@ export const FONT_FAMILIES = [
   { name: 'Lobster', value: 'Lobster, cursive', category: 'script' },
   { name: 'Permanent Marker', value: 'Permanent Marker, cursive', category: 'script' },
   { name: 'Shadows Into Light', value: 'Shadows Into Light, cursive', category: 'script' },
+  { name: 'Satisfy', value: 'Satisfy, cursive', category: 'script' },
+  { name: 'Great Vibes', value: 'Great Vibes, cursive', category: 'script' },
+  { name: 'Yellowtail', value: 'Yellowtail, cursive', category: 'script' },
+  { name: 'Comfortaa', value: 'Comfortaa, cursive', category: 'script' },
   // Mono
   { name: 'Courier New', value: 'Courier New, Courier, monospace', category: 'mono' },
   { name: 'Consolas', value: 'Consolas, Monaco, monospace', category: 'mono' },
@@ -259,7 +296,7 @@ export const DEFAULT_PROJECT: Omit<VideoProject, 'id' | 'createdAt' | 'updatedAt
     content: 'Enter your scrolling text here...\n\nAdd multiple lines for a longer scroll effect.\n\nPerfect for social media reels and videos!',
     fontSize: 48,
     autoScaleFont: true,
-    fontFamily: 'Poppins, sans-serif',
+    fontFamily: 'Verdana, Geneva, sans-serif',
     isBold: false,
     isItalic: false,
     lineHeight: 1.6,
@@ -271,6 +308,18 @@ export const DEFAULT_PROJECT: Omit<VideoProject, 'id' | 'createdAt' | 'updatedAt
     paddingY: 40,
     containerWidth: 98,
     waveAnimation: false,
+    textShadow: {
+      enabled: false,
+      offsetX: 2,
+      offsetY: 2,
+      blur: 4,
+      color: '#000000',
+    },
+    textOutline: {
+      enabled: false,
+      width: 2,
+      color: '#000000',
+    },
   },
   pagedText: {
     mode: 'scroll',
@@ -279,6 +328,9 @@ export const DEFAULT_PROJECT: Omit<VideoProject, 'id' | 'createdAt' | 'updatedAt
   },
   background: {
     color: '#1a1a2e',
+    backgroundType: 'solid',
+    gradientColors: ['#1a1a2e', '#4a0080'],
+    gradientDirection: 'to-bottom',
     image: null,
     video: null,
     blur: 0,
@@ -310,7 +362,7 @@ export const DEFAULT_PROJECT: Omit<VideoProject, 'id' | 'createdAt' | 'updatedAt
     enabled: false,
     useProjectName: true,
     content: '',
-    fontFamily: 'Poppins, sans-serif',
+    fontFamily: 'Verdana, Geneva, sans-serif',
     fontSize: 34,
     isBold: true,
     isItalic: false,

@@ -127,23 +127,38 @@ export const VideoPreview = forwardRef<HTMLDivElement, VideoPreviewProps>(
     const minSafePaddingX = Math.round(75 * scaleFactor);
     const effectivePaddingX = Math.max(scaledPaddingX, minSafePaddingX);
 
-    const textStyle: React.CSSProperties = useMemo(() => ({
-      fontFamily: project.text.fontFamily,
-      fontSize: `${scaledFontSize}px`,
-      fontWeight: project.text.isBold ? 'bold' : 'normal',
-      fontStyle: project.text.isItalic ? 'italic' : 'normal',
-      lineHeight: scaledSettings.lineHeight,
-      letterSpacing: `${scaledLetterSpacing}px`,
-      textAlign: project.text.textAlign,
-      color: project.text.color,
-      whiteSpace: 'pre-wrap',
-      width: `${project.text.containerWidth}%`,
-      paddingLeft: `${effectivePaddingX}px`,
-      paddingRight: `${effectivePaddingX}px`,
-      paddingTop: `${scaledPaddingY}px`,
-      paddingBottom: `${scaledPaddingY}px`,
-      ...getTransformStyle(),
-    }), [effectivePaddingX, project.text, scaledFontSize, scaledPaddingY, scaledLetterSpacing, scaledSettings.lineHeight, getTransformStyle]);
+    const textStyle: React.CSSProperties = useMemo(() => {
+      // Build text shadow CSS
+      const textShadowCSS = project.text.textShadow?.enabled
+        ? `${project.text.textShadow.offsetX}px ${project.text.textShadow.offsetY}px ${project.text.textShadow.blur}px ${project.text.textShadow.color}`
+        : undefined;
+
+      // Build text outline CSS (WebkitTextStroke)
+      const textOutlineCSS = project.text.textOutline?.enabled
+        ? `${project.text.textOutline.width}px ${project.text.textOutline.color}`
+        : undefined;
+
+      return {
+        fontFamily: project.text.fontFamily,
+        fontSize: `${scaledFontSize}px`,
+        fontWeight: project.text.isBold ? 'bold' : 'normal',
+        fontStyle: project.text.isItalic ? 'italic' : 'normal',
+        lineHeight: scaledSettings.lineHeight,
+        letterSpacing: `${scaledLetterSpacing}px`,
+        textAlign: project.text.textAlign,
+        color: project.text.color,
+        whiteSpace: 'pre-wrap',
+        width: `${project.text.containerWidth}%`,
+        paddingLeft: `${effectivePaddingX}px`,
+        paddingRight: `${effectivePaddingX}px`,
+        paddingTop: `${scaledPaddingY}px`,
+        paddingBottom: `${scaledPaddingY}px`,
+        textShadow: textShadowCSS,
+        WebkitTextStroke: textOutlineCSS,
+        paintOrder: textOutlineCSS ? 'stroke fill' : undefined,
+        ...getTransformStyle(),
+      };
+    }, [effectivePaddingX, project.text, scaledFontSize, scaledPaddingY, scaledLetterSpacing, scaledSettings.lineHeight, getTransformStyle]);
 
     useEffect(() => {
       const handleEsc = (e: KeyboardEvent) => {
@@ -410,6 +425,14 @@ export const VideoPreview = forwardRef<HTMLDivElement, VideoPreviewProps>(
               minHeight: '150px',
               minWidth: '100px',
               backgroundColor: project.background.color,
+              background: project.background.backgroundType === 'gradient'
+                ? project.background.gradientDirection === 'radial'
+                  ? `radial-gradient(circle, ${project.background.gradientColors?.[0] ?? '#1a1a2e'}, ${project.background.gradientColors?.[1] ?? '#4a0080'})`
+                  : `linear-gradient(${
+                      project.background.gradientDirection === 'to-bottom' ? '180deg' :
+                      project.background.gradientDirection === 'to-right' ? '90deg' : '135deg'
+                    }, ${project.background.gradientColors?.[0] ?? '#1a1a2e'}, ${project.background.gradientColors?.[1] ?? '#4a0080'})`
+                : project.background.color,
             }}
           >
             {/* Background Image/Video */}

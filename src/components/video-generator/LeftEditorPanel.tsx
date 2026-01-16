@@ -6,7 +6,7 @@ import {
 import { 
   VideoProject, BackgroundSettings, AudioSettings,
   WatermarkSettings, OverlayTextSettings, EndingSettings, TitleOverlaySettings, CutoutOverlaySettings,
-  CANVAS_SIZES, CanvasFormat, VideoTheme, FONT_FAMILIES
+  CANVAS_SIZES, CanvasFormat, VideoTheme, FONT_FAMILIES, BackgroundType, GradientDirection
 } from '@/types/video-project';
 import { useState, useRef } from 'react';
 import { Slider } from '@/components/ui/slider';
@@ -268,32 +268,129 @@ export function LeftEditorPanel({
 
         {/* BACKGROUND Section */}
         <Section title="BG" icon={<Palette className="w-3 h-3" />} defaultOpen={true}>
-          {/* Color picker + presets */}
-          <div className="space-y-1">
-            <div className="flex items-center gap-1">
-              <input
-                type="color"
-                value={project.background.color}
-                onChange={(e) => onBackgroundChange({ color: e.target.value })}
-                className="w-6 h-6 rounded border border-border cursor-pointer"
-              />
-              <span className="text-[9px] text-muted-foreground font-mono">{project.background.color}</span>
-            </div>
-            <div className="grid grid-cols-8 gap-0.5">
-              {BG_COLORS.map((color) => (
-                <button
-                  key={color}
-                  onClick={() => onBackgroundChange({ color })}
-                  className={cn(
-                    'w-full aspect-square rounded border transition-transform hover:scale-110',
-                    project.background.color.toLowerCase() === color.toLowerCase() ? 'border-primary border-2 ring-1 ring-primary/50' : 'border-border/50'
-                  )}
-                  style={{ backgroundColor: color }}
-                  title={color}
-                />
-              ))}
-            </div>
+          {/* Background Type Toggle */}
+          <div className="flex gap-1 mb-2">
+            <button
+              onClick={() => onBackgroundChange({ backgroundType: 'solid' })}
+              className={cn(
+                'flex-1 py-1 text-[9px] font-medium rounded transition-colors',
+                (project.background.backgroundType ?? 'solid') === 'solid'
+                  ? 'bg-primary text-primary-foreground'
+                  : 'bg-muted/50 text-muted-foreground hover:bg-muted'
+              )}
+            >
+              Solid
+            </button>
+            <button
+              onClick={() => onBackgroundChange({ backgroundType: 'gradient' })}
+              className={cn(
+                'flex-1 py-1 text-[9px] font-medium rounded transition-colors',
+                project.background.backgroundType === 'gradient'
+                  ? 'bg-primary text-primary-foreground'
+                  : 'bg-muted/50 text-muted-foreground hover:bg-muted'
+              )}
+            >
+              Gradient
+            </button>
           </div>
+
+          {/* Solid Color */}
+          {(project.background.backgroundType ?? 'solid') === 'solid' && (
+            <div className="space-y-1">
+              <div className="flex items-center gap-1">
+                <input
+                  type="color"
+                  value={project.background.color}
+                  onChange={(e) => onBackgroundChange({ color: e.target.value })}
+                  className="w-6 h-6 rounded border border-border cursor-pointer"
+                />
+                <span className="text-[9px] text-muted-foreground font-mono">{project.background.color}</span>
+              </div>
+              <div className="grid grid-cols-8 gap-0.5">
+                {BG_COLORS.map((color) => (
+                  <button
+                    key={color}
+                    onClick={() => onBackgroundChange({ color })}
+                    className={cn(
+                      'w-full aspect-square rounded border transition-transform hover:scale-110',
+                      project.background.color.toLowerCase() === color.toLowerCase() ? 'border-primary border-2 ring-1 ring-primary/50' : 'border-border/50'
+                    )}
+                    style={{ backgroundColor: color }}
+                    title={color}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Gradient Controls */}
+          {project.background.backgroundType === 'gradient' && (
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <div className="flex-1 space-y-1">
+                  <label className="text-[8px] text-muted-foreground">Start</label>
+                  <input
+                    type="color"
+                    value={project.background.gradientColors?.[0] ?? '#1a1a2e'}
+                    onChange={(e) => onBackgroundChange({ 
+                      gradientColors: [e.target.value, project.background.gradientColors?.[1] ?? '#4a0080'] 
+                    })}
+                    className="w-full h-6 rounded border border-border cursor-pointer"
+                  />
+                </div>
+                <div className="flex-1 space-y-1">
+                  <label className="text-[8px] text-muted-foreground">End</label>
+                  <input
+                    type="color"
+                    value={project.background.gradientColors?.[1] ?? '#4a0080'}
+                    onChange={(e) => onBackgroundChange({ 
+                      gradientColors: [project.background.gradientColors?.[0] ?? '#1a1a2e', e.target.value] 
+                    })}
+                    className="w-full h-6 rounded border border-border cursor-pointer"
+                  />
+                </div>
+              </div>
+              
+              {/* Gradient Direction */}
+              <div className="space-y-1">
+                <label className="text-[8px] text-muted-foreground">Direction</label>
+                <div className="grid grid-cols-4 gap-0.5">
+                  {[
+                    { value: 'to-bottom' as GradientDirection, label: '↓' },
+                    { value: 'to-right' as GradientDirection, label: '→' },
+                    { value: 'to-bottom-right' as GradientDirection, label: '↘' },
+                    { value: 'radial' as GradientDirection, label: '◎' },
+                  ].map(({ value, label }) => (
+                    <button
+                      key={value}
+                      onClick={() => onBackgroundChange({ gradientDirection: value })}
+                      className={cn(
+                        'py-1 rounded text-[10px] font-medium transition-colors',
+                        (project.background.gradientDirection ?? 'to-bottom') === value
+                          ? 'bg-primary text-primary-foreground'
+                          : 'bg-muted/50 text-muted-foreground hover:bg-muted'
+                      )}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Gradient Preview */}
+              <div 
+                className="h-8 rounded border border-border"
+                style={{
+                  background: project.background.gradientDirection === 'radial'
+                    ? `radial-gradient(circle, ${project.background.gradientColors?.[0] ?? '#1a1a2e'}, ${project.background.gradientColors?.[1] ?? '#4a0080'})`
+                    : `linear-gradient(${
+                        project.background.gradientDirection === 'to-bottom' ? '180deg' :
+                        project.background.gradientDirection === 'to-right' ? '90deg' : '135deg'
+                      }, ${project.background.gradientColors?.[0] ?? '#1a1a2e'}, ${project.background.gradientColors?.[1] ?? '#4a0080'})`
+                }}
+              />
+            </div>
+          )}
 
           <div className="grid grid-cols-2 gap-1">
             <button

@@ -406,6 +406,104 @@ export function RightEditorPanel({
             </div>
             <Switch checked={project.text.waveAnimation} onCheckedChange={(checked) => onTextChange({ waveAnimation: checked })} />
           </div>
+
+          {/* Text Shadow */}
+          <div className="space-y-1.5 border-t border-border pt-2">
+            <div className="flex items-center justify-between">
+              <span className="text-[9px] font-medium">Text Shadow</span>
+              <Switch 
+                checked={project.text.textShadow?.enabled ?? false} 
+                onCheckedChange={(checked) => onTextChange({ 
+                  textShadow: { ...project.text.textShadow, enabled: checked } 
+                })} 
+              />
+            </div>
+            {project.text.textShadow?.enabled && (
+              <div className="space-y-1.5 pl-2">
+                <div className="grid grid-cols-2 gap-1">
+                  <div className="space-y-1">
+                    <label className="text-[8px] text-muted-foreground">X: {project.text.textShadow.offsetX}</label>
+                    <Slider 
+                      value={[project.text.textShadow.offsetX]} 
+                      onValueChange={([v]) => onTextChange({ 
+                        textShadow: { ...project.text.textShadow, offsetX: v } 
+                      })} 
+                      min={-20} max={20} step={1} 
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[8px] text-muted-foreground">Y: {project.text.textShadow.offsetY}</label>
+                    <Slider 
+                      value={[project.text.textShadow.offsetY]} 
+                      onValueChange={([v]) => onTextChange({ 
+                        textShadow: { ...project.text.textShadow, offsetY: v } 
+                      })} 
+                      min={-20} max={20} step={1} 
+                    />
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[8px] text-muted-foreground">Blur: {project.text.textShadow.blur}</label>
+                  <Slider 
+                    value={[project.text.textShadow.blur]} 
+                    onValueChange={([v]) => onTextChange({ 
+                      textShadow: { ...project.text.textShadow, blur: v } 
+                    })} 
+                    min={0} max={30} step={1} 
+                  />
+                </div>
+                <div className="flex items-center gap-1">
+                  <label className="text-[8px] text-muted-foreground">Color</label>
+                  <input 
+                    type="color" 
+                    value={project.text.textShadow.color} 
+                    onChange={(e) => onTextChange({ 
+                      textShadow: { ...project.text.textShadow, color: e.target.value } 
+                    })} 
+                    className="w-5 h-5 border border-border cursor-pointer rounded" 
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Text Outline */}
+          <div className="space-y-1.5 border-t border-border pt-2">
+            <div className="flex items-center justify-between">
+              <span className="text-[9px] font-medium">Text Outline</span>
+              <Switch 
+                checked={project.text.textOutline?.enabled ?? false} 
+                onCheckedChange={(checked) => onTextChange({ 
+                  textOutline: { ...project.text.textOutline, enabled: checked } 
+                })} 
+              />
+            </div>
+            {project.text.textOutline?.enabled && (
+              <div className="space-y-1.5 pl-2">
+                <div className="space-y-1">
+                  <label className="text-[8px] text-muted-foreground">Width: {project.text.textOutline.width}px</label>
+                  <Slider 
+                    value={[project.text.textOutline.width]} 
+                    onValueChange={([v]) => onTextChange({ 
+                      textOutline: { ...project.text.textOutline, width: v } 
+                    })} 
+                    min={1} max={10} step={0.5} 
+                  />
+                </div>
+                <div className="flex items-center gap-1">
+                  <label className="text-[8px] text-muted-foreground">Color</label>
+                  <input 
+                    type="color" 
+                    value={project.text.textOutline.color} 
+                    onChange={(e) => onTextChange({ 
+                      textOutline: { ...project.text.textOutline, color: e.target.value } 
+                    })} 
+                    className="w-5 h-5 border border-border cursor-pointer rounded" 
+                  />
+                </div>
+              </div>
+            )}
+          </div>
         </Section>
 
         {/* Animation Section */}
