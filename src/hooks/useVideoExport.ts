@@ -769,7 +769,13 @@ export function useVideoExport() {
             if (project.text.textAlign === 'right') textX = (width + containerWidth) / 2 - effectivePaddingX;
 
             // Use unified scroll calculation - MATCHES PREVIEW EXACTLY
-            let scrollY = calculateScrollPosition(scrollState.progress, height, totalTextHeight);
+            // Apply top/bottom margins
+            const marginTop = project.text.marginTop ?? 0;
+            const marginBottom = project.text.marginBottom ?? 0;
+            const availableHeight = height - marginTop - marginBottom;
+            
+            let scrollY = calculateScrollPosition(scrollState.progress, availableHeight, totalTextHeight);
+            scrollY += marginTop; // Offset by top margin
 
             // Reserve space below title overlay so text never overlaps it
             const titleTextForOffset = project.titleOverlay?.enabled
@@ -782,11 +788,11 @@ export function useVideoExport() {
 
             // For non-scrolling directions, honor vertical alignment preference
             if (project.animation.direction !== 'up') {
-              const safeHeight = height;
+              const safeHeight = availableHeight;
               const blockH = totalTextHeight;
-              if (project.text.verticalAlign === 'top') scrollY = 0;
-              else if (project.text.verticalAlign === 'bottom') scrollY = Math.max(0, safeHeight - blockH);
-              else scrollY = Math.max(0, (safeHeight - blockH) / 2);
+              if (project.text.verticalAlign === 'top') scrollY = marginTop;
+              else if (project.text.verticalAlign === 'bottom') scrollY = Math.max(marginTop, height - marginBottom - blockH);
+              else scrollY = Math.max(marginTop, marginTop + (safeHeight - blockH) / 2);
               scrollY += titleOffsetY;
             }
 

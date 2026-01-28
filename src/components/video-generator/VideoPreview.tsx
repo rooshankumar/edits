@@ -529,8 +529,16 @@ export const VideoPreview = forwardRef<HTMLDivElement, VideoPreviewProps>(
               <div 
                 ref={containerRef} 
                 className={cn('absolute inset-0 overflow-hidden flex',
-                  project.animation.direction === 'up' ? 'flex-col items-center' : 'items-center')}
-                style={{ opacity: transitionOpacity.contentOpacity, transition: 'opacity 0.5s ease-in-out' }}
+                  project.animation.direction === 'up' ? 'flex-col' : '',
+                  project.text.verticalAlign === 'top' ? 'items-start' : project.text.verticalAlign === 'bottom' ? 'items-end' : 'items-center',
+                  project.animation.direction === 'up' ? 'justify-start' : 'justify-center'
+                )}
+                style={{ 
+                  opacity: transitionOpacity.contentOpacity, 
+                  transition: 'opacity 0.5s ease-in-out',
+                  paddingTop: `${(project.text.marginTop ?? 0) * scaleFactor}px`,
+                  paddingBottom: `${(project.text.marginBottom ?? 0) * scaleFactor}px`,
+                }}
               >
                 {project.theme === 'lyrics' ? (
                   <KaraokeLyricsCanvas

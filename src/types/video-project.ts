@@ -46,6 +46,10 @@ export interface TextSettings {
   waveAnimation: boolean;
   textShadow: TextShadowSettings;
   textOutline: TextOutlineSettings;
+  marginTop: number;
+  marginBottom: number;
+  fitToScreen: boolean;
+  minMargin: number;
 }
 
 export interface TitleOverlaySettings {
@@ -320,6 +324,10 @@ export const DEFAULT_PROJECT: Omit<VideoProject, 'id' | 'createdAt' | 'updatedAt
       width: 2,
       color: '#000000',
     },
+    marginTop: 0,
+    marginBottom: 0,
+    fitToScreen: false,
+    minMargin: 20,
   },
   pagedText: {
     mode: 'scroll',
