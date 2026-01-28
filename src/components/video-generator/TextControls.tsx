@@ -1,7 +1,8 @@
-import { Bold, Italic, AlignLeft, AlignCenter, AlignRight, AlignVerticalJustifyStart, AlignVerticalJustifyCenter, AlignVerticalJustifyEnd, MoveHorizontal, MoveVertical } from 'lucide-react';
+import { Bold, Italic, AlignLeft, AlignCenter, AlignRight, AlignVerticalJustifyStart, AlignVerticalJustifyCenter, AlignVerticalJustifyEnd, MoveHorizontal, MoveVertical, Maximize } from 'lucide-react';
 import { TextSettings, FONT_FAMILIES } from '@/types/video-project';
 import { Textarea } from '@/components/ui/textarea';
 import { Slider } from '@/components/ui/slider';
+import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
 
@@ -217,6 +218,78 @@ export function TextControls({ settings, onChange }: TextControlsProps) {
           step={5}
           className="py-2"
         />
+      </div>
+
+      {/* Margin Top */}
+      <div className="space-y-2">
+        <div className="flex justify-between items-center">
+          <label className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
+            <MoveVertical className="w-3.5 h-3.5" />
+            Margin Top
+          </label>
+          <span className="text-xs font-mono text-primary">{settings.marginTop ?? 0}px</span>
+        </div>
+        <Slider
+          value={[settings.marginTop ?? 0]}
+          onValueChange={([v]) => onChange({ marginTop: v })}
+          min={0}
+          max={200}
+          step={5}
+          className="py-2"
+        />
+      </div>
+
+      {/* Margin Bottom */}
+      <div className="space-y-2">
+        <div className="flex justify-between items-center">
+          <label className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
+            <MoveVertical className="w-3.5 h-3.5" />
+            Margin Bottom
+          </label>
+          <span className="text-xs font-mono text-primary">{settings.marginBottom ?? 0}px</span>
+        </div>
+        <Slider
+          value={[settings.marginBottom ?? 0]}
+          onValueChange={([v]) => onChange({ marginBottom: v })}
+          min={0}
+          max={200}
+          step={5}
+          className="py-2"
+        />
+      </div>
+
+      {/* Fit to Screen Toggle */}
+      <div className="space-y-3 p-3 rounded-lg bg-muted/30 border border-border">
+        <div className="flex items-center justify-between">
+          <label className="text-xs font-medium text-foreground flex items-center gap-1.5">
+            <Maximize className="w-3.5 h-3.5" />
+            Fit to Screen
+          </label>
+          <Switch
+            checked={settings.fitToScreen ?? false}
+            onCheckedChange={(checked) => onChange({ fitToScreen: checked })}
+          />
+        </div>
+        <p className="text-[10px] text-muted-foreground">
+          Auto-scale text to fit within the screen with minimum margins
+        </p>
+        
+        {(settings.fitToScreen ?? false) && (
+          <div className="space-y-2 pt-2 border-t border-border">
+            <div className="flex justify-between items-center">
+              <label className="text-xs font-medium text-muted-foreground">Min Safe Margin</label>
+              <span className="text-xs font-mono text-primary">{settings.minMargin ?? 20}px</span>
+            </div>
+            <Slider
+              value={[settings.minMargin ?? 20]}
+              onValueChange={([v]) => onChange({ minMargin: v })}
+              min={10}
+              max={50}
+              step={5}
+              className="py-2"
+            />
+          </div>
+        )}
       </div>
 
       {/* Line Height */}
